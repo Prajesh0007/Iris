@@ -1,0 +1,261 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f6f8fb;
+  color: #1e293b;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark Mode Class-Based Overrides */
+html.dark body {
+  background-color: #090d16;
+  color: #e6edf3;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Glassmorphism Classes */
+.glass {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 10px 40px -10px rgba(79, 70, 229, 0.04), 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+html.dark .glass {
+  background: rgba(13, 17, 26, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
+.glass-header {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.01);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+html.dark .glass-header {
+  background: rgba(13, 17, 26, 0.8);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.glass-dark {
+  background: rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+html.dark .glass-dark {
+  background: rgba(240, 246, 252, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+html.dark .glass-pill {
+  background: rgba(22, 27, 34, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Auto-Adapt Light colors mapping to High-Contrast Dark Theme elements */
+html.dark .text-slate-950,
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-750,
+html.dark .text-slate-850 {
+  color: #f0f6fc !important;
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-650,
+html.dark .text-slate-600 {
+  color: #c9d1d9 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: #8b949e !important;
+}
+
+html.dark .bg-white {
+  background-color: #0f1420 !important;
+  color: #e6edf3 !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-slate-100,
+html.dark .bg-slate-100\/75,
+html.dark .bg-slate-100\/60 {
+  background-color: #121824 !important;
+}
+
+html.dark .bg-indigo-50 {
+  background-color: rgba(79, 70, 229, 0.15) !important;
+  color: #818cf8 !important;
+}
+
+html.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+}
+
+html.dark .bg-slate-200\/65 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-150,
+html.dark .border-slate-200,
+html.dark .border-slate-200\/50,
+html.dark .border-indigo-100,
+html.dark .border-emerald-100 {
+  border-color: #21262d !important;
+}
+
+html.dark .bg-slate-250\/55 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+html.dark input, 
+html.dark select, 
+html.dark textarea {
+  background-color: #121824 !important;
+  border-color: #30363d !important;
+  color: #f0f6fc !important;
+}
+
+html.dark input:focus, 
+html.dark select:focus, 
+html.dark textarea:focus {
+  border-color: #58a6ff !important;
+}
+
+html.dark .divide-slate-100\/60 > * + * {
+  border-color: #21262d !important;
+}
+
+html.dark tr:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+html.dark select option {
+  background-color: #0f1420 !important;
+  color: #f0f6fc !important;
+}
+
+/* Base scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 9px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* Animated Ambient Blobs */
+@keyframes float {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.95); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes float-reverse {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-40px, 40px) scale(0.95); }
+  66% { transform: translate(30px, -30px) scale(1.15); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+.animate-blob {
+  animation: float 22s infinite alternate ease-in-out;
+}
+
+.animate-blob-reverse {
+  animation: float-reverse 18s infinite alternate ease-in-out;
+}
+
+/* Cosmic high-contrast gradient override for dark mode min-h-screen container */
+html.dark .min-h-screen,
+html.dark .bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, #070a13, #090d16, #0c111c) !important;
+}
+
+/* Prism Dark Theme Overrides (Tomorrow Night inspired) */
+html.dark .token.comment,
+html.dark .token.block-comment,
+html.dark .token.prolog,
+html.dark .token.doctype,
+html.dark .token.cdata {
+  color: #999;
+}
+html.dark .token.punctuation {
+  color: #ccc;
+}
+html.dark .token.tag,
+html.dark .token.attr-name,
+html.dark .token.namespace,
+html.dark .token.deleted {
+  color: #e2777a;
+}
+html.dark .token.function-name {
+  color: #6196cc;
+}
+html.dark .token.boolean,
+html.dark .token.number,
+html.dark .token.function {
+  color: #f08d49;
+}
+html.dark .token.property,
+html.dark .token.class-name,
+html.dark .token.constant,
+html.dark .token.symbol {
+  color: #f8c555;
+}
+html.dark .token.selector,
+html.dark .token.important,
+html.dark .token.atrule,
+html.dark .token.keyword,
+html.dark .token.builtin {
+  color: #cc99cd;
+}
+html.dark .token.string,
+html.dark .token.char,
+html.dark .token.attr-value,
+html.dark .token.regex,
+html.dark .token.variable {
+  color: #7ec699;
+}
+html.dark .token.operator,
+html.dark .token.entity,
+html.dark .token.url {
+  color: #67cdcc;
+}

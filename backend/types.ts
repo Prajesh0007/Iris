@@ -130,6 +130,20 @@ export interface ExamAnswer {
     expected: string;
     actual: string;
   }[];
+  // Full question snapshot stored at submission time for self-contained reports
+  questionSnapshot?: {
+    title: string;
+    type: QuestionType;
+    questionText: string;
+    points: number;
+    options?: string[];
+    correctOptionIndex?: number;
+    language?: string;
+    testCases?: { input: string; expectedOutput: string; isHidden?: boolean; name?: string }[];
+    codeBoilerplate?: string;
+  };
+  // Grading result for this specific question
+  earnedPoints?: number;
 }
 
 export interface Submission {

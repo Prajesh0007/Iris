@@ -134,6 +134,7 @@ interface DashboardProps {
   onCreateExam: (exam: Exam) => void;
   onSelectExam: (exam: Exam, name: string, email: string) => void;
   onViewLogs: () => void;
+  user?: any;
 }
 
 export default function Dashboard({
@@ -144,6 +145,7 @@ export default function Dashboard({
   onCreateExam,
   onSelectExam,
   onViewLogs,
+  user,
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<
     "take" | "desk" | "notes" | "tasks" | "calendar" | "attendance"
@@ -240,19 +242,18 @@ export default function Dashboard({
 
   // Student taking metadata variables
   const [candidateName, setCandidateName] = useState<string>(
-    "Prajesh Ramamoorthy",
+    user.user_metadata?.name || user.email?.split("@")[0] || ""
   );
   const [candidateEmail, setCandidateEmail] = useState<string>(
-    "prajeshramamoorthy2007@gmail.com",
+    user.email || ""
   );
   const [selectedExamForTake, setSelectedExamForTake] = useState<Exam | null>(
     null,
   );
 
   const handleStartExamFlow = async (exam: Exam) => {
-    const finalName = candidateName.trim() || "Prajesh Ramamoorthy";
-    const finalEmail =
-      candidateEmail.trim() || "prajeshramamoorthy2007@gmail.com";
+    const finalName = candidateName.trim() || user.user_metadata?.name || "Student";
+    const finalEmail = candidateEmail.trim() || user.email || "student@university.edu";
 
     if (exam.allowedIps && exam.allowedIps.length > 0) {
       try {
@@ -273,10 +274,10 @@ export default function Dashboard({
     }
 
     if (!candidateName.trim()) {
-      setCandidateName("Prajesh Ramamoorthy");
+      setCandidateName(finalName);
     }
     if (!candidateEmail.trim()) {
-      setCandidateEmail("prajeshramamoorthy2007@gmail.com");
+      setCandidateEmail(finalEmail);
     }
 
     onSelectExam(exam, finalName, finalEmail);
@@ -437,8 +438,9 @@ export default function Dashboard({
 
       {activeTab === "tasks" && (
         <TaskPortal 
-          userRole={userRole}
-          studentContext={studentContext}
+          userRole={userRole} 
+          studentContext={studentContext} 
+          user={user}
         />
       )}
 

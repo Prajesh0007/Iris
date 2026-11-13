@@ -40,6 +40,7 @@ async function initDb() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'student',
@@ -93,9 +94,10 @@ async function initDb() {
     // Fallback migration for existing DBs
     try {
       await connection.query(`ALTER TABLE exams ADD COLUMN start_time VARCHAR(255)`);
-    } catch (err) {
-      // column likely exists
-    }
+    } catch (err) {}
+    try {
+      await connection.query(`ALTER TABLE users ADD COLUMN name VARCHAR(255) DEFAULT 'Student' AFTER id`);
+    } catch (err) {}
     
     await connection.query(`
       CREATE TABLE IF NOT EXISTS classes (
@@ -213,14 +215,14 @@ initDb();
 
 const app = express();
 app.use(cors());
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
 // Enable JSON body requests with large payload capacity for webcam screenshots (base64)
 app.use(express.json({ limit: "500mb" }));
 app.use(express.urlencoded({ limit: "500mb", extended: true }));
 
 // Initialize memory state with realistic, rich past exam submissions so teacher dashboards look active on start!
-let exams: Exam[] = [...DEFAULT_EXAMS];
+let exams: Exam[] = [];
 let noteFiles: any[] = [];
 let tasks: any[] = [];
 let taskSubmissions: any[] = [];
@@ -228,143 +230,7 @@ let academicEvents: any[] = [];
 let classes: any[] = [];
 let attendanceSessions: any[] = [];
 let notices: any[] = [];
-
-
-let submissions: Submission[] = [
-  {
-    id: "sub-demo-1",
-    examId: "exam-js-core",
-    examTitle: "JavaScript System Programming & Algorithms",
-    candidateName: "Marcus Aurelius",
-    candidateEmail: "marcus.phil@academy.edu",
-    status: "passed",
-    startedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-    submittedAt: new Date(Date.now() - 3000000).toISOString(),
-    integrityScore: 95,
-    score: 90,
-    maxScore: 100,
-    violations: [
-      {
-        timestamp: new Date(Date.now() - 3400000).toISOString(),
-        type: "blur",
-        description:
-          "Lost cursor focus for 3.2 seconds. Warning overlay prompted.",
-        severity: "low",
-      },
-    ],
-    aiReports: [
-      {
-        timestamp: new Date(Date.now() - 3500000).toISOString(),
-        status: "clean",
-        summary: "Candidate aligned centered with good screen brightness.",
-        faceDetected: true,
-        eyeContactStatus: "focused",
-        phoneDetected: false,
-        multiplePeople: false,
-        confidence: 0.98,
-      },
-    ],
-    answers: [
-      { questionId: "q-js-1", mcqAnswer: 1 },
-      { questionId: "q-js-2", mcqAnswer: 0 },
-      {
-        questionId: "q-js-3",
-        codingCode: `function twoSum(nums, target) {
-  const map = new Map();
-  for (let i = 0; i < nums.length; i++) {
-    const complement = target - nums[i];
-    if (map.has(complement)) {
-      return [map.get(complement), i];
-    }
-    map.set(nums[i], i);
-  }
-}`,
-        testCasesResults: [
-          {
-            passed: true,
-            input: "[[2,7,11,15], 9]",
-            expected: "[0,1]",
-            actual: "[0,1]",
-          },
-          {
-            passed: true,
-            input: "[[3,2,4], 6]",
-            expected: "[1,2]",
-            actual: "[1,2]",
-          },
-          {
-            passed: true,
-            input: "[[3,3], 6]",
-            expected: "[0,1]",
-            actual: "[0,1]",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "sub-demo-2",
-    examId: "exam-js-core",
-    examTitle: "JavaScript System Programming & Algorithms",
-    candidateName: "Isabella Vance",
-    candidateEmail: "bella.v@gmail.com",
-    status: "failed",
-    startedAt: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-    submittedAt: new Date(Date.now() - 6500000).toISOString(),
-    integrityScore: 35, // Low integrity!
-    score: 20,
-    maxScore: 100,
-    violations: [
-      {
-        timestamp: new Date(Date.now() - 7100000).toISOString(),
-        type: "tab-switch",
-        description:
-          "Candidate switched tabs to lookup resource on third-party site.",
-        severity: "high",
-      },
-      {
-        timestamp: new Date(Date.now() - 7000000).toISOString(),
-        type: "fullscreen-exit",
-        description:
-          "Exited lockdown browser fullscreen state (Violations counter: 2).",
-        severity: "high",
-      },
-      {
-        timestamp: new Date(Date.now() - 6800000).toISOString(),
-        type: "proctor-warning",
-        description: "Secondary device / Cell phone detected in hand.",
-        severity: "high",
-      },
-    ],
-    aiReports: [
-      {
-        timestamp: new Date(Date.now() - 7100000).toISOString(),
-        status: "warning",
-        summary:
-          "Gaze deviation: Candidate turned head completely to the right for 12 seconds.",
-        faceDetected: true,
-        eyeContactStatus: "distracted",
-        phoneDetected: false,
-        multiplePeople: false,
-        confidence: 0.85,
-      },
-      {
-        timestamp: new Date(Date.now() - 6800000).toISOString(),
-        status: "flagged",
-        summary: "Flagged: Smart phone object caught in camera feed.",
-        faceDetected: true,
-        eyeContactStatus: "distracted",
-        phoneDetected: true,
-        multiplePeople: false,
-        confidence: 0.94,
-      },
-    ],
-    answers: [
-      { questionId: "q-js-1", mcqAnswer: 0 }, // wrong answer
-      { questionId: "q-js-2", mcqAnswer: 2 }, // wrong answer
-    ],
-  },
-];
+let submissions: Submission[] = [];
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({
@@ -674,9 +540,9 @@ function simulateCodeExecution(
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_iris_jwt_key_2026';
 
 app.post("/api/auth/register", async (req, res) => {
-  const { email, password, role } = req.body;
-  if (!email || !password) {
-    res.status(400).json({ error: "Email and password are required" });
+  const { name, email, password, role } = req.body;
+  if (!name || !email || !password) {
+    res.status(400).json({ error: "Name, email, and password are required" });
     return;
   }
   try {
@@ -695,16 +561,16 @@ app.post("/api/auth/register", async (req, res) => {
 
     // Insert user
     await dbPool.query(
-      "INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)",
-      [userId, email, passwordHash, userRole]
+      "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
+      [userId, name, email, passwordHash, userRole]
     );
 
     // Create token
-    const token = jwt.sign({ id: userId, email, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: userId, name, email, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
     
     res.status(201).json({ 
       token, 
-      user: { id: userId, email, role: userRole } 
+      user: { id: userId, name, email, role: userRole } 
     });
   } catch (err: any) {
     console.error("Register Error:", err);
@@ -732,11 +598,11 @@ app.post("/api/auth/login", async (req, res) => {
       return;
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     
     res.status(200).json({ 
       token, 
-      user: { id: user.id, email: user.email, role: user.role } 
+      user: { id: user.id, name: user.name, email: user.email, role: user.role } 
     });
   } catch (err: any) {
     console.error("Login Error:", err);
@@ -769,19 +635,14 @@ app.get("/api/exams", async (req, res) => {
   } catch (err) {
     console.error("MySQL GET exams failed", err);
   }
-  res.json(exams); // fallback
+  res.json([]); // Return empty array if no exams or error
 });
 
 // 2. Publish New Exam
 app.post("/api/exams", async (req, res) => {
   const newExam = req.body;
-  if (!newExam || !newExam.title) {
-    res.status(400).json({ error: "Invalid exam payload" });
-    return;
-  }
   newExam.id = "exam-" + Date.now();
   newExam.createdAt = new Date().toISOString().split("T")[0];
-  exams.unshift(newExam); // update memory fallback
   
   try {
     await dbPool.query(
@@ -840,12 +701,7 @@ app.get("/api/exams/:id", async (req, res) => {
     console.error("MySQL GET single exam failed", err);
   }
   
-  const exam = exams.find((e) => e.id === req.params.id);
-  if (!exam) {
-    res.status(404).json({ error: "Exam not found" });
-    return;
-  }
-  res.json(exam);
+  res.status(404).json({ error: "Exam not found" });
 });
 
 // 3.5. Download SEB Configuration
@@ -869,12 +725,16 @@ app.get("/api/exams/:id/seb", async (req, res) => {
     if (exam) examTitle = exam.title;
   }
   
+  const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
+  const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'localhost:5173';
+  const frontendBase = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : `${protocol}://${host}`;
+
   const sebXml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>startURL</key>
-  <string>http://localhost:5173/?examId=${req.params.id}</string>
+  <string>${frontendBase}/?examId=${req.params.id}</string>
 </dict>
 </plist>`;
 
@@ -906,14 +766,13 @@ app.get("/api/submissions", async (req, res) => {
         startedAt: dbSub.started_at,
         submittedAt: dbSub.submitted_at,
       }));
-      submissions = mapped;
       res.json(mapped);
       return;
     }
   } catch (e) {
-    console.error("MySQL GET submissions failed. Memory fallback used.", e);
+    console.error("MySQL GET submissions failed", e);
   }
-  res.json(submissions);
+  res.json([]);
 });
 
 // 5. Submit Exam
@@ -937,11 +796,6 @@ app.post("/api/submissions", async (req, res) => {
   }
 
   if (!exam) {
-    // Fallback to memory array just in case
-    exam = exams.find((e) => e.id === submissionData.examId);
-  }
-
-  if (!exam) {
     res.status(404).json({ error: "Associated exam not found" });
     return;
   }
@@ -958,11 +812,30 @@ app.post("/api/submissions", async (req, res) => {
 
       maxScore += question.points;
 
+      // Build a snapshot of the full question for self-contained reports
+      const questionSnapshot = {
+        title: question.title,
+        type: question.type,
+        questionText: question.questionText,
+        points: question.points,
+        options: question.options,
+        correctOptionIndex: question.correctOptionIndex,
+        language: question.language,
+        testCases: question.testCases?.map((tc: any) => ({
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          isHidden: tc.isHidden,
+          name: tc.name,
+        })),
+        codeBoilerplate: question.codeBoilerplate,
+      };
+
       // MCQ calculations
       if (question.type === "mcq") {
         const isCorrect = ans.mcqAnswer === question.correctOptionIndex;
+        const earned = isCorrect ? question.points : 0;
         if (isCorrect) score += question.points;
-        return ans;
+        return { ...ans, questionSnapshot, earnedPoints: earned };
       }
 
       // Coding evaluations
@@ -1013,22 +886,26 @@ app.post("/api/submissions", async (req, res) => {
         const challengeRatio = testCases.length
           ? passedCount / testCases.length
           : 0;
-        score += Math.round(challengeRatio * question.points);
+        const earned = Math.round(challengeRatio * question.points);
+        score += earned;
 
         return {
           ...ans,
           testCasesResults,
+          questionSnapshot,
+          earnedPoints: earned,
         };
       }
 
       // Written evaluations (simple text check)
       if (question.type === "written") {
         const passed = (ans.writtenAnswer || "").trim().length > 10;
+        const earned = passed ? question.points : 0;
         if (passed) score += question.points;
-        return ans;
+        return { ...ans, questionSnapshot, earnedPoints: earned };
       }
 
-      return ans;
+      return { ...ans, questionSnapshot, earnedPoints: 0 };
     }) || [];
 
   const finalScore = score;
@@ -1063,8 +940,6 @@ app.post("/api/submissions", async (req, res) => {
     submittedAt: new Date().toISOString(),
   };
 
-  submissions.unshift(newSubmission);
-
   try {
     await dbPool.query(
       `INSERT INTO submissions 
@@ -1089,13 +964,124 @@ app.post("/api/submissions", async (req, res) => {
       ]
     );
     } catch (e) {
-      console.error("MySQL POST submission failed. Memory fallback used.", e);
+      console.error("MySQL POST submission failed", e);
     }
 
     res.status(201).json(newSubmission);
   } catch (err: any) {
     console.error("Unhandled error during exam grading:", err);
     res.status(500).json({ error: "Internal grading error", details: err.message });
+  }
+});
+
+// 5.5 Get Class Statistics for a specific exam (used by diagnostic reports)
+app.get("/api/submissions/stats/:examId", async (req, res) => {
+  try {
+    const examId = req.params.examId;
+    
+    // Fetch all submissions for this exam
+    let examSubmissions: any[] = [];
+    try {
+      const [rows] = await dbPool.query<any[]>(
+        "SELECT score, max_score, answers FROM submissions WHERE exam_id = ?",
+        [examId]
+      );
+      if (rows && rows.length > 0) {
+        examSubmissions = rows.map((r) => ({
+          score: Number(r.score),
+          maxScore: Number(r.max_score),
+          answers: typeof r.answers === "string" ? JSON.parse(r.answers) : r.answers,
+        }));
+      }
+    } catch (dbErr) {
+      console.error("MySQL GET stats failed", dbErr);
+    }
+
+    const totalStudents = examSubmissions.length;
+    if (totalStudents === 0) {
+      res.json({
+        totalStudents: 0,
+        classAverage: 0,
+        classMedian: 0,
+        highestScore: 0,
+        lowestScore: 0,
+        stdDeviation: 0,
+        maxPossible: 0,
+        scoreDistribution: [],
+        perQuestionAverages: {},
+      });
+      return;
+    }
+
+    const scores = examSubmissions.map((s) => s.score);
+    const maxPossible = examSubmissions[0]?.maxScore || 100;
+    const sorted = [...scores].sort((a, b) => a - b);
+    
+    const sum = scores.reduce((a, b) => a + b, 0);
+    const classAverage = parseFloat((sum / totalStudents).toFixed(1));
+    
+    const mid = Math.floor(totalStudents / 2);
+    const classMedian = totalStudents % 2 === 0
+      ? parseFloat(((sorted[mid - 1] + sorted[mid]) / 2).toFixed(1))
+      : sorted[mid];
+    
+    const highestScore = sorted[sorted.length - 1];
+    const lowestScore = sorted[0];
+    
+    const variance = scores.reduce((acc, s) => acc + Math.pow(s - classAverage, 2), 0) / totalStudents;
+    const stdDeviation = parseFloat(Math.sqrt(variance).toFixed(2));
+    
+    // Score distribution bins (0-10, 10-20, ... up to maxPossible)
+    const binSize = Math.max(Math.ceil(maxPossible / 10), 1);
+    const bins: { range: string; count: number }[] = [];
+    for (let i = 0; i < maxPossible; i += binSize) {
+      const upper = Math.min(i + binSize, maxPossible);
+      bins.push({
+        range: `${i}-${upper}`,
+        count: scores.filter((s) => s >= i && s < upper).length,
+      });
+    }
+    // Ensure the max score is included in the last bin
+    if (bins.length > 0) {
+      bins[bins.length - 1].count += scores.filter((s) => s === maxPossible).length;
+    }
+
+    // Per-question class averages
+    const perQuestionAverages: { [questionId: string]: { avgEarned: number; maxPoints: number; totalAttempts: number } } = {};
+    examSubmissions.forEach((sub) => {
+      if (sub.answers && Array.isArray(sub.answers)) {
+        sub.answers.forEach((ans: any) => {
+          const qId = ans.questionId;
+          if (!perQuestionAverages[qId]) {
+            perQuestionAverages[qId] = { avgEarned: 0, maxPoints: ans.questionSnapshot?.points || 0, totalAttempts: 0 };
+          }
+          perQuestionAverages[qId].avgEarned += (ans.earnedPoints || 0);
+          perQuestionAverages[qId].totalAttempts += 1;
+        });
+      }
+    });
+    // Convert sums to averages
+    Object.keys(perQuestionAverages).forEach((qId) => {
+      const entry = perQuestionAverages[qId];
+      if (entry.totalAttempts > 0) {
+        entry.avgEarned = parseFloat((entry.avgEarned / entry.totalAttempts).toFixed(1));
+      }
+    });
+
+    res.json({
+      totalStudents,
+      classAverage,
+      classMedian,
+      highestScore,
+      lowestScore,
+      stdDeviation,
+      maxPossible,
+      scoreDistribution: bins,
+      perQuestionAverages,
+    });
+  } catch (err: any) {
+    console.error("Stats endpoint error:", err);
+    res.status(500).json({ error: "Failed to compute stats" });
   }
 });
 
@@ -1873,3 +1859,5 @@ async function startServer() {
 }
 
 startServer();
+
+export default app;

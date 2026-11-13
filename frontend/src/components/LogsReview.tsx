@@ -27,13 +27,15 @@ import {
   Search,
   Filter,
   SortDesc,
-  ChevronDown
+  ChevronDown,
+  ClipboardList
 } from "lucide-react";
 import { Submission, Violation } from "../types";
 import {
   exportCertificateToPDF,
   exportDetailedReportPDF,
 } from "../utils/pdfExport";
+import { exportDiagnosticReportPDF } from "../utils/diagnosticReport";
 import PerformanceOverview from "./PerformanceOverview";
 import LiveProctorGrid from "./LiveProctorGrid";
 
@@ -422,7 +424,13 @@ export default function LogsReview({
               </span>
             </div>
 
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 flex-wrap">
+              <button
+                onClick={() => exportDiagnosticReportPDF(selectedSubmission, submissions)}
+                className="bg-rose-700 hover:bg-rose-800 active:scale-95 transition-all text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm shadow-rose-200"
+              >
+                <ClipboardList className="h-4 w-4" /> Diagnostic Report
+              </button>
               <button
                 onClick={() => exportDetailedReportPDF(selectedSubmission)}
                 className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-150"

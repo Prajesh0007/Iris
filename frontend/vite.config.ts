@@ -19,10 +19,15 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
-          changeOrigin: true
-        }
-      }
+          target: process.env.BACKEND_URL || 'http://localhost:3001',
+          changeOrigin: true,
+        },
+        '/socket.io': {
+          target: process.env.BACKEND_URL || 'http://localhost:3001',
+          ws: true,
+          changeOrigin: true,
+        },
+      },
     },
   };
 });

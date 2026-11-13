@@ -1,0 +1,55 @@
+Scenario A: If you create a completely EMPTY repo on GitHub (Best Practice)
+
+Use this pipeline if you do not check the boxes for a README, .gitignore, or License on GitHub:
+
+# To initialize the git repository
+git init
+
+# To stage the files 
+git add .
+
+# To commit the changes
+git commit -m "Initial commit"
+
+# To rename the branch to main
+git branch -M main
+
+# To add the remote origin
+git remote add origin <YOUR_REPOSITORY_URL>
+
+# To push the code to the github 
+git push -u origin main
+
+# To delete a file from the github
+git rm --cached <filename>
+git commit -m "Removed file from repository"
+git push
+
+
+Scenario B: If you create a repo WITH a README / .gitignore on GitHub
+
+If GitHub already contains files when you create it, you must pull those files down first before you can push. Use this exact pipeline:
+
+git init
+
+git add .
+
+git commit -m "Initial commit"
+
+git branch -M main
+
+git remote add origin <YOUR_REPOSITORY_URL>
+
+# Crucial step: Pull the GitHub files first
+git pull origin main --allow-unrelated-histories
+
+# Push your combined files
+git push -u origin main
+
+# To stage ( git add / git rm ): You tell Git which changes you want to prepare.
+# To commit ( git commit ): You take a "snapshot" of those changes and save it to your local history.
+# To push ( git push ): You upload that local history to GitHub so everyone else can see it.
+
+Term                                   What it means                                               Example in your project
+origin             The remote server location (GitHub URL) where your code lives online.            https://github.com...
+Branch             A timeline or version of your code.                                              main or master

@@ -29,6 +29,7 @@ import Dashboard from "./components/Dashboard";
 import ExamTaker from "./components/ExamTaker";
 import LogsReview from "./components/LogsReview";
 import { exportCertificateToPDF } from "./utils/pdfExport";
+import { exportDiagnosticReportPDF } from "./utils/diagnosticReport";
 import { Auth } from "./components/Auth";
 import { User } from "./types";
 import NotificationsPopover from "./components/NotificationsPopover";
@@ -285,6 +286,7 @@ export default function App() {
           <Dashboard
             userRole={userRole}
             userEmail={user.email}
+            user={user}
             studentContext={studentContext}
             exams={exams}
             onCreateExam={handleCreateExam}
@@ -483,12 +485,20 @@ export default function App() {
               </button>
 
               {activeSubmission && (
-                <button
-                  onClick={() => exportCertificateToPDF(activeSubmission)}
-                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3.5 px-6 rounded-2xl text-xs shadow-lg shadow-indigo-150 transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Download className="h-4 w-4" /> Export Certificate PDF
-                </button>
+                <>
+                  <button
+                    onClick={() => exportDiagnosticReportPDF(activeSubmission, submissions)}
+                    className="w-full sm:w-auto bg-rose-700 hover:bg-rose-800 active:scale-95 text-white font-bold py-3.5 px-6 rounded-2xl text-xs shadow-lg shadow-rose-200 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Download className="h-4 w-4" /> View My Diagnostic Report
+                  </button>
+                  <button
+                    onClick={() => exportCertificateToPDF(activeSubmission)}
+                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3.5 px-6 rounded-2xl text-xs shadow-lg shadow-indigo-150 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Download className="h-4 w-4" /> Export Certificate PDF
+                  </button>
+                </>
               )}
             </div>
           </div>

@@ -34,6 +34,7 @@ import {
 } from "../types";
 
 import CodeEditor from "./CodeEditor";
+import { Panel, Group, Separator } from "react-resizable-panels";
 
 interface ExamTakerProps {
   exam: Exam;
@@ -963,126 +964,151 @@ export default function ExamTaker({
             )}
           </div>
 
-          {/* Active Question Title Card header */}
-          <div className="glass p-6 sm:p-7 rounded-3xl border border-white/65 text-left flex flex-col gap-4 shadow-sm">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <span className="text-[10px] font-bold uppercase text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded border border-indigo-100 tracking-wider">
-                Question {activeQuestionIndex + 1} of {exam.questions.length}
-              </span>
-              <span className="text-xs text-slate-500 font-bold font-mono bg-slate-100 px-2 py-0.5 rounded">
-                Weight: {activeQuestion.points} points
-              </span>
-            </div>
-
-            <h3 className="text-xl font-bold text-slate-950 font-sans tracking-tight">
-              {activeQuestion.title}
-            </h3>
-
-            {/* Render question details description */}
-            <div className="bg-white/55 p-4 rounded-2xl border border-slate-150 text-xs font-semibold text-slate-650 whitespace-pre-wrap leading-relaxed font-sans">
-              {activeQuestion.questionText}
-            </div>
-
-            {/* Format-dependent inputs selection fields */}
-            {activeQuestion.type === "mcq" && activeQuestion.options && (
-              <div className="flex flex-col gap-2.5 mt-2.5">
-                {activeQuestion.options.map((opt, oIdx) => {
-                  const savedAnswer = answers.find(
-                    (a) => a.questionId === activeQuestion.id,
-                  );
-                  const isChecked = savedAnswer?.mcqAnswer === oIdx;
-
-                  return (
-                    <button
-                      key={oIdx}
-                      disabled={isSubmitting || timeLeftSeconds <= 0}
-                      onClick={() => handleMCQSelect(oIdx)}
-                      className={`text-left p-4 rounded-xl border transition-all text-xs font-semibold flex items-center justify-between cursor-pointer ${
-                        isChecked
-                          ? "bg-indigo-50 border-indigo-300 text-indigo-950 shadow-xs"
-                          : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
-                      } disabled:opacity-60 disabled:cursor-not-allowed`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <span
-                          className={`h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] border transition-colors ${
-                            isChecked
-                              ? "bg-indigo-600 border-indigo-600 text-white"
-                              : "bg-slate-100 border-slate-200 text-slate-500"
-                          }`}
-                        >
-                          {String.fromCharCode(65 + oIdx)}
-                        </span>
-                        {opt}
+          {/* Active Question Title Card header / Layout */}
+          {activeQuestion.type === "coding" ? (
+            <div className="glass rounded-3xl border border-white/65 shadow-sm overflow-hidden h-[750px] flex flex-col">
+              <Group orientation="horizontal" className="w-full h-full">
+                {/* Left Panel: Description */}
+                <Panel defaultSize={40} minSize={25} className="flex flex-col bg-white/50">
+                  <div className="p-6 sm:p-7 flex flex-col gap-4 h-full overflow-y-auto">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                      <span className="text-[10px] font-bold uppercase text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded border border-indigo-100 tracking-wider">
+                        Question {activeQuestionIndex + 1} of {exam.questions.length}
                       </span>
-                      {isChecked && (
-                        <CheckCircle className="h-4.5 w-4.5 text-indigo-600" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                      <span className="text-xs text-slate-500 font-bold font-mono bg-slate-100 px-2 py-0.5 rounded">
+                        Weight: {activeQuestion.points} points
+                      </span>
+                    </div>
 
-            {/* Code challenges implementation cockpit selection */}
-            {activeQuestion.type === "coding" && (
-              <div className="mt-2.5 flex flex-col gap-3">
-                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <Terminal className="h-4 w-4 text-indigo-500" />
-                    <span className="text-xs font-semibold text-slate-700">
-                      Test Cases Progress
-                    </span>
+                    <h3 className="text-xl font-bold text-slate-950 font-sans tracking-tight">
+                      {activeQuestion.title}
+                    </h3>
+
+                    <div className="bg-white/80 p-4 rounded-xl border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans shadow-sm">
+                      {activeQuestion.questionText}
+                    </div>
+
+                    {/* Test Case Progress Summary */}
+                    <div className="mt-4 flex flex-col gap-3">
+                      <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <Terminal className="h-4 w-4 text-indigo-500" />
+                          <span className="text-xs font-semibold text-slate-700">
+                            Test Cases Progress
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {(activeQuestion.testCases || []).map((tc, idx) => {
+                            const passing = testCaseProgress[activeQuestion.id]?.[idx];
+                            return (
+                              <div
+                                key={idx}
+                                title={tc.name || `Test Case ${idx + 1}`}
+                                className={`h-2 w-6 rounded-full transition-colors duration-300 ${
+                                  passing === true
+                                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                                    : passing === false
+                                      ? "bg-rose-500"
+                                      : "bg-slate-300"
+                                }`}
+                              />
+                            );
+                          })}
+                          <span className="text-[10px] font-bold text-slate-500 ml-2">
+                            {testCaseProgress[activeQuestion.id]?.filter(Boolean).length || 0} / {(activeQuestion.testCases || []).length} Passed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {(activeQuestion.testCases || []).map((tc, idx) => {
-                      const passing =
-                        testCaseProgress[activeQuestion.id]?.[idx];
-                      return (
-                        <div
-                          key={idx}
-                          title={tc.name || `Test Case ${idx + 1}`}
-                          className={`h-2 w-8 rounded-full transition-colors duration-300 ${
-                            passing === true
-                              ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
-                              : passing === false
-                                ? "bg-rose-500"
-                                : "bg-slate-300"
-                          }`}
-                        />
-                      );
-                    })}
-                    <span className="text-[10px] font-bold text-slate-500 ml-2">
-                      {testCaseProgress[activeQuestion.id]?.filter(Boolean)
-                        .length || 0}{" "}
-                      / {(activeQuestion.testCases || []).length} Passed
-                    </span>
-                  </div>
+                </Panel>
+
+                <Separator className="w-1.5 h-full flex items-center justify-center cursor-col-resize hover:bg-indigo-500/20 bg-slate-200 transition-colors">
+                  <div className="h-8 w-1 rounded-full bg-slate-400/50" />
+                </Separator>
+
+                {/* Right Panel: Editor & Console */}
+                <Panel defaultSize={60} minSize={30} className="flex flex-col bg-slate-50 h-full">
+                  <CodeEditor
+                    questionId={activeQuestion.id}
+                    code={answers.find((a) => a.questionId === activeQuestion.id)?.codingCode || ""}
+                    onChange={handleCodingEdit}
+                    language={activeQuestion.language || "javascript"}
+                    boilerplate={activeQuestion.codeBoilerplate || ""}
+                    testCases={activeQuestion.testCases || []}
+                    readOnly={isSubmitting || timeLeftSeconds <= 0}
+                    onCodeExecuted={(passed, tcIndex) => {
+                      setTestCaseProgress((prev) => {
+                        const currentProgress = prev[activeQuestion.id] || [];
+                        const nextProgress = [...currentProgress];
+                        nextProgress[tcIndex] = passed;
+                        return { ...prev, [activeQuestion.id]: nextProgress };
+                      });
+                    }}
+                  />
+                </Panel>
+              </Group>
+            </div>
+          ) : (
+            <div className="glass p-6 sm:p-7 rounded-3xl border border-white/65 text-left flex flex-col gap-4 shadow-sm">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <span className="text-[10px] font-bold uppercase text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded border border-indigo-100 tracking-wider">
+                  Question {activeQuestionIndex + 1} of {exam.questions.length}
+                </span>
+                <span className="text-xs text-slate-500 font-bold font-mono bg-slate-100 px-2 py-0.5 rounded">
+                  Weight: {activeQuestion.points} points
+                </span>
+              </div>
+
+              <h3 className="text-xl font-bold text-slate-950 font-sans tracking-tight">
+                {activeQuestion.title}
+              </h3>
+
+              <div className="bg-white/55 p-4 rounded-2xl border border-slate-150 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">
+                {activeQuestion.questionText}
+              </div>
+
+              {activeQuestion.type === "mcq" && activeQuestion.options && (
+                <div className="flex flex-col gap-2.5 mt-2.5">
+                  {activeQuestion.options.map((opt, oIdx) => {
+                    const savedAnswer = answers.find(
+                      (a) => a.questionId === activeQuestion.id,
+                    );
+                    const isChecked = savedAnswer?.mcqAnswer === oIdx;
+
+                    return (
+                      <button
+                        key={oIdx}
+                        disabled={isSubmitting || timeLeftSeconds <= 0}
+                        onClick={() => handleMCQSelect(oIdx)}
+                        className={`text-left p-4 rounded-xl border transition-all text-xs font-semibold flex items-center justify-between cursor-pointer ${
+                          isChecked
+                            ? "bg-indigo-50 border-indigo-300 text-indigo-950 shadow-xs"
+                            : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                        } disabled:opacity-60 disabled:cursor-not-allowed`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <span
+                            className={`h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] border transition-colors ${
+                              isChecked
+                                ? "bg-indigo-600 border-indigo-600 text-white"
+                                : "bg-slate-100 border-slate-200 text-slate-500"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + oIdx)}
+                          </span>
+                          {opt}
+                        </span>
+                        {isChecked && (
+                          <CheckCircle className="h-4.5 w-4.5 text-indigo-600" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                <CodeEditor
-                  questionId={activeQuestion.id}
-                  code={
-                    answers.find((a) => a.questionId === activeQuestion.id)
-                      ?.codingCode || ""
-                  }
-                  onChange={handleCodingEdit}
-                  language={activeQuestion.language || "javascript"}
-                  boilerplate={activeQuestion.codeBoilerplate || ""}
-                  testCases={activeQuestion.testCases || []}
-                  readOnly={isSubmitting || timeLeftSeconds <= 0}
-                  onCodeExecuted={(passed, tcIndex) => {
-                    setTestCaseProgress((prev) => {
-                      const currentProgress = prev[activeQuestion.id] || [];
-                      const nextProgress = [...currentProgress];
-                      nextProgress[tcIndex] = passed;
-                      return { ...prev, [activeQuestion.id]: nextProgress };
-                    });
-                  }}
-                />
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Navigation sliders back to next bar */}
           <div className="flex justify-between items-center">

@@ -84,7 +84,8 @@ const MultiSelect = ({
 
 export default function TaskPortal({
   userRole,
-  studentContext
+  studentContext,
+  user
 }: {
   userRole?: "student" | "teacher";
   studentContext?: {
@@ -92,6 +93,7 @@ export default function TaskPortal({
     years: string[];
     classes: string[];
   };
+  user?: any;
 }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
@@ -123,9 +125,9 @@ export default function TaskPortal({
   const [filterYear, setFilterYear] = useState("All");
   const [filterClass, setFilterClass] = useState("All");
 
-  // Student mock info
-  const [studentName] = useState("Prajesh Ramamoorthy");
-  const [studentEmail] = useState("prajeshramamoorthy2007@gmail.com");
+  // Student user info
+  const studentName = user?.user_metadata?.name || "Student";
+  const studentEmail = user?.email || "student@university.edu";
 
   const fetchData = () => {
     fetch("/api/tasks")

@@ -6,6 +6,7 @@ export function Auth({
 }: {
   onLogin: (user: User, role: "student" | "teacher") => void;
 }) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"student" | "teacher">("student");
@@ -23,7 +24,7 @@ export function Auth({
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role }),
+        body: JSON.stringify(isSignUp ? { name, email, password, role } : { email, password, role }),
       });
       
       const data = await res.json();
@@ -39,7 +40,7 @@ export function Auth({
       const dummyUser: User = {
         id: data.user.id,
         app_metadata: {},
-        user_metadata: { role: data.user.role },
+        user_metadata: { role: data.user.role, full_name: data.user.name },
         aud: "authenticated",
         created_at: new Date().toISOString(),
         email: data.user.email,
@@ -58,7 +59,7 @@ export function Auth({
     const dummyUser: User = {
       id: "demo-user-id-5542",
       app_metadata: {},
-      user_metadata: { role: demoRole },
+      user_metadata: { role: demoRole, full_name: demoRole === "student" ? "Marcus Aurelius" : "Prof. Dumbledore" },
       aud: "authenticated",
       created_at: new Date().toISOString(),
       email:
@@ -122,6 +123,21 @@ export function Auth({
             </div>
 
             <form onSubmit={handleAuth} className="flex flex-col gap-4">
+              {isSignUp && (
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                    placeholder="John Doe"
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">
                   Student Email
@@ -179,6 +195,21 @@ export function Auth({
             </div>
 
             <form onSubmit={handleAuth} className="flex flex-col gap-4">
+              {isSignUp && (
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:bg-white transition-all"
+                    placeholder="Prof. Jane Doe"
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">
                   Teacher Email

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Exam } from "../types";
+import { Exam } from "../types.js";
 
 export const DEFAULT_EXAMS: Exam[] = [
   {

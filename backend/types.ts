@@ -83,6 +83,10 @@ export interface Exam {
   subject: string;
   department?: string;
   year?: string;
+  targetClasses?: string[];
+  targetYears?: string[];
+  targetDepartments?: string[];
+  startTime?: string;
   durationMinutes: number;
   integrityThreshold: number; // minimum integrity index before locking (0-100)
   requireCamera: boolean;

@@ -64,3 +64,4 @@ echo "🎉 DEPLOYMENT COMPLETE!"
 echo "Your app is now running on http://$(curl -s ifconfig.me)"
 echo "Backend is managed via PM2: 'pm2 status' / 'pm2 logs'"
 echo "================================================================================"
+

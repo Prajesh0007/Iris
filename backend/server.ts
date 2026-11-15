@@ -204,6 +204,44 @@ async function initDb() {
       )
     `);
 
+    // Seed default sample exams if empty
+    try {
+      const [examCountRows] = await connection.query<any[]>("SELECT COUNT(*) as count FROM exams");
+      if (examCountRows && examCountRows[0]?.count === 0) {
+        for (const ex of DEFAULT_EXAMS) {
+          await connection.query(
+            `INSERT INTO exams 
+             (id, title, description, subject, department, year, duration_minutes, integrity_threshold, require_camera, lockdown_browsing, entry_password, admin_exit_password, allowed_ips, shuffle_questions, questions, created_at, author, target_classes, start_time) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              ex.id,
+              ex.title,
+              ex.description,
+              ex.subject,
+              ex.department || "General",
+              ex.year || "All",
+              ex.durationMinutes,
+              ex.integrityThreshold,
+              ex.requireCamera,
+              ex.lockdownBrowsing,
+              ex.entryPassword,
+              ex.adminExitPassword,
+              JSON.stringify(ex.allowedIps || []),
+              ex.shuffleQuestions,
+              JSON.stringify(ex.questions),
+              ex.createdAt,
+              ex.author,
+              JSON.stringify(ex.targetClasses || []),
+              ex.startTime || null,
+            ]
+          );
+        }
+        console.log("✅ Seeded default sample exams into MySQL database.");
+      }
+    } catch (seedErr) {
+      console.warn("Notice: MySQL sample exam seeding deferred or skipped:", seedErr);
+    }
+
     connection.release();
     console.log("✅ MySQL database initialized with users, submissions, and exams tables.");
   } catch (err) {
@@ -635,7 +673,7 @@ app.get("/api/exams", async (req, res) => {
   } catch (err) {
     console.error("MySQL GET exams failed", err);
   }
-  res.json([]); // Return empty array if no exams or error
+  res.json(DEFAULT_EXAMS); // Return default sample exams so the platform is immediately testable
 });
 
 // 2. Publish New Exam
@@ -701,6 +739,12 @@ app.get("/api/exams/:id", async (req, res) => {
     console.error("MySQL GET single exam failed", err);
   }
   
+  const fallback = DEFAULT_EXAMS.find((e) => e.id === req.params.id);
+  if (fallback) {
+    res.json(fallback);
+    return;
+  }
+
   res.status(404).json({ error: "Exam not found" });
 });
 
@@ -713,7 +757,7 @@ app.get("/api/exams/:id/seb", async (req, res) => {
     if (rows && rows.length > 0) {
       examTitle = rows[0].title;
     } else {
-      const exam = exams.find((e) => e.id === req.params.id);
+      const exam = exams.find((e) => e.id === req.params.id) || DEFAULT_EXAMS.find((e) => e.id === req.params.id);
       if (exam) examTitle = exam.title;
       else {
         res.status(404).json({ error: "Exam not found" });
@@ -721,7 +765,7 @@ app.get("/api/exams/:id/seb", async (req, res) => {
       }
     }
   } catch (err) {
-    const exam = exams.find((e) => e.id === req.params.id);
+    const exam = exams.find((e) => e.id === req.params.id) || DEFAULT_EXAMS.find((e) => e.id === req.params.id);
     if (exam) examTitle = exam.title;
   }
   

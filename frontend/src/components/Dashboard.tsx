@@ -22,12 +22,14 @@ import {
   CheckCircle2,
   Eye,
   Award,
+  Sparkles,
 } from "lucide-react";
 import { Exam, Question, TestCase, QuestionType } from "../types";
 import NotesPortal from "./NotesPortal";
 import TaskPortal from "./TaskPortal";
 import AcademicCalendar from "./AcademicCalendar";
 import TeacherDesk from "./TeacherDesk";
+import InterviewPrep from "./InterviewPrep";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 function StudentAttendance({ email }: { email: string }) {
@@ -148,7 +150,7 @@ export default function Dashboard({
   user,
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "take" | "desk" | "notes" | "tasks" | "calendar" | "attendance"
+    "take" | "desk" | "notes" | "tasks" | "calendar" | "attendance" | "interview"
   >(userRole === "student" ? "take" : "desk");
 
   // Derived filtered exams for student
@@ -427,7 +429,33 @@ export default function Dashboard({
             <div className="absolute bottom-0 inset-x-4 h-0.5 bg-indigo-600 rounded-full" />
           )}
         </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("interview");
+            setSelectedExamForTake(null);
+          }}
+          className={`pb-3.5 px-4 text-sm font-semibold transition-all relative cursor-pointer ${
+            activeTab === "interview"
+              ? "text-indigo-600"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4 text-violet-500" /> Interview Prep & AI Mocks
+          </div>
+          {activeTab === "interview" && (
+            <div className="absolute bottom-0 inset-x-4 h-0.5 bg-indigo-600 rounded-full" />
+          )}
+        </button>
       </div>
+
+      {activeTab === "interview" && (
+        <InterviewPrep
+          user={user}
+          userRole={userRole}
+        />
+      )}
 
       {activeTab === "notes" && (
         <NotesPortal 

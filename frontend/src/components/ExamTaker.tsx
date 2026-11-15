@@ -24,6 +24,7 @@ import {
   Terminal,
   Camera,
   Mic,
+  Lock,
 } from "lucide-react";
 import {
   Exam,
@@ -108,16 +109,23 @@ export default function ExamTaker({
     null,
   );
 
-  // SEB Passwords Authentication state
+  // SEB Passwords Authentication state - ALWAYS locked by default
   const [entryPasswordInput, setEntryPasswordInput] = useState<string>("");
-  const [isEntryLocked, setIsEntryLocked] = useState<boolean>(
-    !!liveExam.entryPassword,
-  );
+  const [isEntryLocked, setIsEntryLocked] = useState<boolean>(true);
   const [entryPasswordError, setEntryPasswordError] = useState<boolean>(false);
 
   const [exitPasswordInput, setExitPasswordInput] = useState<string>("");
   const [showExitDialog, setShowExitDialog] = useState<boolean>(false);
   const [exitPasswordError, setExitPasswordError] = useState<boolean>(false);
+  const [showExitModal, setShowExitModal] = useState<boolean>(false);
+  const [pendingExitAction, setPendingExitAction] = useState<"submit" | "quit">("submit");
+
+  const promptExitAuthorization = (action: "submit" | "quit") => {
+    setExitPasswordInput("");
+    setExitPasswordError(false);
+    setPendingExitAction(action);
+    setShowExitModal(true);
+  };
 
   const activeQuestion = liveExam.questions[activeQuestionIndex];
 
@@ -504,16 +512,9 @@ export default function ExamTaker({
               />
               {entryPasswordError && (
                 <span className="text-[11px] text-rose-500 font-bold text-center">
-                  Incorrect PIN/Password. Please check with your exam proctor.
+                  Incorrect PIN/Password. Please enter the password set by your teacher.
                 </span>
               )}
-
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/60 flex items-center justify-between text-slate-500 text-[11px]">
-                <span className="font-semibold">Invigilator Key / Test PIN:</span>
-                <code className="bg-white px-2 py-0.5 rounded border border-slate-200 font-bold text-indigo-600 font-mono">
-                  {requiredPassword}
-                </code>
-              </div>
 
               <div className="flex gap-3 w-full mt-2">
                 <button
@@ -922,20 +923,12 @@ export default function ExamTaker({
             </div>
           </div>
 
-          {/* Fast Exit Emergency Button */}
+          {/* Fast Exit Emergency Button - Strict Teacher Exit Password Enforced */}
           <button
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Are you sure you want to exit the exam environment? Doing so will permanently lock any solved answers and submit immediately.",
-                )
-              ) {
-                handleSubmitAnswers(true);
-              }
-            }}
+            onClick={() => promptExitAuthorization("quit")}
             className="w-full bg-slate-900 text-slate-100 hover:bg-black py-3.5 rounded-2xl text-[10px] font-bold font-sans tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-lg shadow-slate-200/50"
           >
-            <LogOut className="h-4 w-4" /> Finish & Submit Attempt
+            <LogOut className="h-4 w-4" /> Quit / Submit Exam
           </button>
         </div>
 
@@ -1162,7 +1155,7 @@ export default function ExamTaker({
                 </button>
               ) : (
                 <button
-                  onClick={() => handleSubmitAnswers(false)}
+                  onClick={() => promptExitAuthorization("submit")}
                   disabled={isSubmitting}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
                 >
@@ -1173,6 +1166,83 @@ export default function ExamTaker({
           </div>
         </div>
       </div>
+
+      {/* Strict Invigilator Exit Authorization Modal */}
+      {showExitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 max-w-md w-full relative text-center">
+            <div className="h-14 w-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto mb-4">
+              <Lock className="h-7 w-7" />
+            </div>
+            <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 mb-2">
+              Invigilator Authorization Required
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Exam Exit Verification
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+              As configured by the teacher conducting this examination, your invigilator must enter their Exit PIN/Password to authorize {pendingExitAction === "quit" ? "quitting" : "submitting"} this exam session.
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const requiredExitPw = (liveExam.adminExitPassword || exam.adminExitPassword || "admin").trim();
+                if (exitPasswordInput.trim() === requiredExitPw) {
+                  setShowExitModal(false);
+                  handleSubmitAnswers(true);
+                } else {
+                  setExitPasswordError(true);
+                }
+              }}
+              className="flex flex-col gap-3 text-left"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                  Teacher Exit Password / PIN
+                </label>
+                <input
+                  type="password"
+                  value={exitPasswordInput}
+                  onChange={(e) => {
+                    setExitPasswordInput(e.target.value);
+                    setExitPasswordError(false);
+                  }}
+                  placeholder="Enter teacher exit password"
+                  className={`w-full px-4 py-3 bg-slate-50 border ${
+                    exitPasswordError
+                      ? "border-rose-400 focus:ring-rose-500"
+                      : "border-slate-200 focus:ring-indigo-500"
+                  } rounded-xl text-sm focus:outline-none focus:bg-white transition-all font-mono text-slate-900`}
+                  autoFocus
+                  required
+                />
+                {exitPasswordError && (
+                  <p className="text-xs font-bold text-rose-500 mt-1.5">
+                    Incorrect exit password. Please consult your exam invigilator.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2.5 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowExitModal(false)}
+                  className="flex-1 py-3 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer transition-all"
+                >
+                  Return to Exam
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl cursor-pointer shadow-md transition-all active:scale-95"
+                >
+                  Authorize & {pendingExitAction === "quit" ? "Quit" : "Submit"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

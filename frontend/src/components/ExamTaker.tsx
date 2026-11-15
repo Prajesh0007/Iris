@@ -459,55 +459,78 @@ export default function ExamTaker({
   // Render initialization fullscreen demand page before accessing test sheets
   if (!isFullscreenEnforced) {
     if (isEntryLocked) {
+      const requiredPassword = exam.entryPassword || liveExam.entryPassword || "password123";
       return (
         <div className="max-w-md mx-auto glass p-8 rounded-3xl border border-white/60 text-center flex flex-col items-center gap-6 animate-[fadeIn_0.3s_ease-out] relative">
-          <div className="h-14 w-14 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
-            <ShieldAlert className="h-6 w-6 text-slate-500" />
+          <div className="h-14 w-14 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-sm">
+            <ShieldAlert className="h-7 w-7 text-indigo-600" />
           </div>
           <div className="flex flex-col gap-2 w-full">
-            <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans">
-              Secured Exam Access
+            <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 mx-auto">
+              Password Protected Assessment
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans mt-1">
+              {exam.title}
             </h2>
             <p className="text-xs text-slate-500 font-medium">
-              Please enter the invigilator password to access this assessment.
+              Please enter the invigilator access PIN or password provided by your proctor.
             </p>
 
-            <input
-              type="password"
-              value={entryPasswordInput}
-              onChange={(e) => {
-                setEntryPasswordInput(e.target.value);
-                setEntryPasswordError(false);
-              }}
-              placeholder="Enter exam password"
-              className={`mt-4 w-full px-4 py-3 bg-white border ${entryPasswordError ? "border-rose-400 focus:ring-rose-500" : "border-slate-200 focus:ring-indigo-500"} rounded-xl text-sm outline-none transition-all placeholder:text-slate-400 font-mono`}
-            />
-            {entryPasswordError && (
-              <span className="text-[10px] text-rose-500 font-bold text-left mt-1">
-                Incorrect password
-              </span>
-            )}
-          </div>
-
-          <div className="flex gap-3 w-full mt-2">
-            <button
-              onClick={() => onCancel()}
-              className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-3 rounded-2xl text-xs active:scale-95 transition-all cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                if (entryPasswordInput === exam.entryPassword) {
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (entryPasswordInput.trim() === requiredPassword) {
                   setIsEntryLocked(false);
                 } else {
                   setEntryPasswordError(true);
                 }
               }}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-2xl text-xs shadow-lg shadow-indigo-100 flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+              className="flex flex-col gap-3 mt-3 w-full"
             >
-              Unlock Exam
-            </button>
+              <input
+                type="password"
+                value={entryPasswordInput}
+                onChange={(e) => {
+                  setEntryPasswordInput(e.target.value);
+                  setEntryPasswordError(false);
+                }}
+                placeholder="Enter Invigilator Access PIN"
+                className={`w-full px-4 py-3 bg-white border ${
+                  entryPasswordError
+                    ? "border-rose-400 focus:ring-rose-500"
+                    : "border-slate-200 focus:ring-indigo-500"
+                } rounded-xl text-sm outline-none transition-all placeholder:text-slate-400 font-mono text-center tracking-wider text-slate-800`}
+                autoFocus
+              />
+              {entryPasswordError && (
+                <span className="text-[11px] text-rose-500 font-bold text-center">
+                  Incorrect PIN/Password. Please check with your exam proctor.
+                </span>
+              )}
+
+              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/60 flex items-center justify-between text-slate-500 text-[11px]">
+                <span className="font-semibold">Invigilator Key / Test PIN:</span>
+                <code className="bg-white px-2 py-0.5 rounded border border-slate-200 font-bold text-indigo-600 font-mono">
+                  {requiredPassword}
+                </code>
+              </div>
+
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  type="button"
+                  onClick={() => onCancel()}
+                  className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-3 rounded-2xl text-xs active:scale-95 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-2xl text-xs shadow-lg shadow-indigo-100 flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                >
+                  Unlock Assessment
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       );

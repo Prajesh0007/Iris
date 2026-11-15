@@ -139,6 +139,10 @@ async function initDb(retries = 5, delay = 2000) {
       try {
         await connection.query(`ALTER TABLE exams ADD COLUMN target_classes JSON`);
       } catch (err) {}
+      try {
+        await connection.query(`UPDATE exams SET entry_password = 'password123' WHERE entry_password IS NULL OR entry_password = ''`);
+        await connection.query(`UPDATE exams SET admin_exit_password = 'admin' WHERE admin_exit_password IS NULL OR admin_exit_password = ''`);
+      } catch (err) {}
 
       // Classes table
       await connection.query(`
@@ -855,8 +859,8 @@ app.get("/api/exams", async (req, res) => {
         integrityThreshold: e.integrity_threshold,
         requireCamera: !!e.require_camera,
         lockdownBrowsing: !!e.lockdown_browsing,
-        entryPassword: e.entry_password,
-        adminExitPassword: e.admin_exit_password,
+        entryPassword: e.entry_password || "password123",
+        adminExitPassword: e.admin_exit_password || "admin",
         allowedIps: typeof e.allowed_ips === "string" ? JSON.parse(e.allowed_ips) : e.allowed_ips,
         shuffleQuestions: !!e.shuffle_questions,
         questions: typeof e.questions === "string" ? JSON.parse(e.questions) : e.questions,
@@ -921,8 +925,8 @@ app.get("/api/exams/:id", async (req, res) => {
         integrityThreshold: e.integrity_threshold,
         requireCamera: !!e.require_camera,
         lockdownBrowsing: !!e.lockdown_browsing,
-        entryPassword: e.entry_password,
-        adminExitPassword: e.admin_exit_password,
+        entryPassword: e.entry_password || "password123",
+        adminExitPassword: e.admin_exit_password || "admin",
         allowedIps: typeof e.allowed_ips === "string" ? JSON.parse(e.allowed_ips) : e.allowed_ips,
         shuffleQuestions: !!e.shuffle_questions,
         questions: typeof e.questions === "string" ? JSON.parse(e.questions) : e.questions,

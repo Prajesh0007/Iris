@@ -73,6 +73,8 @@ export const DEFAULT_EXAMS: Exam[] = [
     integrityThreshold: 45,
     requireCamera: true,
     lockdownBrowsing: true,
+    entryPassword: "password123",
+    adminExitPassword: "admin",
     createdAt: "2026-06-18",
     author: "Prof. Katherine Vance",
     questions: [
@@ -181,6 +183,8 @@ export const DEFAULT_EXAMS: Exam[] = [
     integrityThreshold: 60,
     requireCamera: true,
     lockdownBrowsing: true,
+    entryPassword: "password123",
+    adminExitPassword: "admin",
     createdAt: "2026-06-18",
     author: "Dr. Raymond Carver",
     questions: [

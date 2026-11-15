@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Plus, CheckCircle, FileText, Calendar, Bell, ClipboardCheck, 
   BookOpen, Clock, AlertOctagon, ShieldCheck, Award, 
-  Trash2, PlusCircle, Save, X
+  Trash2, PlusCircle, Save, X, Lock
 } from "lucide-react";
 import { Exam, Question, QuestionType, TestCase, Submission } from "../types";
 
@@ -77,6 +77,8 @@ export default function TeacherDesk({
   const [examIntegrityThreshold, setExamIntegrityThreshold] = useState<number>(50);
   const [examRequireCamera, setExamRequireCamera] = useState(true);
   const [examLockdownBrowsing, setExamLockdownBrowsing] = useState(true);
+  const [examEntryPassword, setExamEntryPassword] = useState("password123");
+  const [examAdminExitPassword, setExamAdminExitPassword] = useState("admin");
   const [questions, setQuestions] = useState<Question[]>([]);
 
   // Current Question Drafting State
@@ -167,6 +169,8 @@ export default function TeacherDesk({
       integrityThreshold: examIntegrityThreshold,
       requireCamera: examRequireCamera,
       lockdownBrowsing: examLockdownBrowsing,
+      entryPassword: examEntryPassword || "password123",
+      adminExitPassword: examAdminExitPassword || "admin",
       questions,
       author: "Teacher",
     };
@@ -505,6 +509,34 @@ export default function TeacherDesk({
                 <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-rose-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all shadow-inner"></div>
                 <span className="text-sm font-bold text-slate-700 transition-colors">Strict App Lockdown</span>
               </label>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-3 border-t border-slate-100">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-indigo-500" /> Exam Security Passwords
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Invigilator Entry PIN</label>
+                  <input
+                    type="text"
+                    value={examEntryPassword}
+                    onChange={(e) => setExamEntryPassword(e.target.value)}
+                    placeholder="e.g. password123"
+                    className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Admin Exit PIN</label>
+                  <input
+                    type="text"
+                    value={examAdminExitPassword}
+                    onChange={(e) => setExamAdminExitPassword(e.target.value)}
+                    placeholder="e.g. admin"
+                    className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
             </div>
 
             <button type="button" onClick={handleGenerateExam} className="mt-6 w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl mt-auto">

@@ -3,8 +3,10 @@ import { User } from "../types";
 
 export function Auth({
   onLogin,
+  onClose,
 }: {
   onLogin: (user: User, role: "student" | "teacher") => void;
+  onClose?: () => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -83,6 +85,16 @@ export function Auth({
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 max-w-sm w-full z-10 relative">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 z-20 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer transition-all"
+            title="Continue without sign-in"
+          >
+            ✕
+          </button>
+        )}
         {/* Portal Switching Tabs */}
         <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
           <button
@@ -280,6 +292,18 @@ export function Auth({
               {isSignUp
                 ? "Already have an account? Sign In"
                 : "No account? Need to register?"}
+            </button>
+          </div>
+        )}
+
+        {onClose && (
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-bold transition-colors cursor-pointer"
+            >
+              Continue without signing in →
             </button>
           </div>
         )}

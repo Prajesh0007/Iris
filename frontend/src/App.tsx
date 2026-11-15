@@ -34,38 +34,58 @@ import { Auth } from "./components/Auth";
 import { User } from "./types";
 import NotificationsPopover from "./components/NotificationsPopover";
 
-export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<"student" | "teacher">("student");
-  const [page, setPage] = useState<
-    "portal" | "taking" | "submitted" | "teacher-logs"
-  >("portal");
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+const DEFAULT_USER: User = {
+  id: "guest-student-001",
+  app_metadata: {},
+  user_metadata: { role: "student", full_name: "Student Candidate" },
+  aud: "authenticated",
+  created_at: new Date().toISOString(),
+  email: "student@university.edu",
+  role: "authenticated",
+};
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem("iris_token");
+export default function App() {
+  const [user, setUser] = useState<User>(() => {
     const storedUser = localStorage.getItem("iris_user");
-    if (storedToken && storedUser) {
+    if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        const dummyUser: User = {
+        return {
           id: parsed.id,
           app_metadata: {},
-          user_metadata: { role: parsed.role },
+          user_metadata: { role: parsed.role, full_name: parsed.name || "Student Candidate" },
           aud: "authenticated",
           created_at: new Date().toISOString(),
           email: parsed.email,
           role: "authenticated",
         };
-        setUser(dummyUser);
-        setUserRole(parsed.role as "student" | "teacher");
       } catch (e) {
         localStorage.removeItem("iris_token");
         localStorage.removeItem("iris_user");
       }
     }
-  }, []);
+    return DEFAULT_USER;
+  });
+
+  const [userRole, setUserRole] = useState<"student" | "teacher">(() => {
+    const storedUser = localStorage.getItem("iris_user");
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (parsed.role === "teacher" || parsed.role === "student") {
+          return parsed.role;
+        }
+      } catch (e) {}
+    }
+    return "student";
+  });
+
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [page, setPage] = useState<
+    "portal" | "taking" | "submitted" | "teacher-logs"
+  >("portal");
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
 
   // Theme state & synchronization
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -185,17 +205,6 @@ export default function App() {
     (s) => s.id === completedSubmissionId,
   );
 
-  if (!user) {
-    return (
-      <Auth
-        onLogin={(u, r) => {
-          setUser(u);
-          setUserRole(r);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50 text-slate-800 selection:bg-indigo-150/75">
       {/* Background soft pastel glowing glass blobs */}
@@ -221,15 +230,31 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3.5 text-xs font-semibold text-slate-900">
-            <div
-              className={`py-2 px-3.5 rounded-xl font-bold border ${
+            {/* Interactive Role Switcher Button */}
+            <button
+              onClick={() => {
+                const nextRole = userRole === "student" ? "teacher" : "student";
+                setUserRole(nextRole);
+                setUser((prev) => ({
+                  ...prev,
+                  user_metadata: {
+                    ...prev.user_metadata,
+                    role: nextRole,
+                    full_name: nextRole === "teacher" ? "Prof. Dumbledore" : "Student Candidate",
+                  },
+                  email: nextRole === "teacher" ? "teacher@university.edu" : "student@university.edu",
+                }));
+              }}
+              className={`py-2 px-3.5 rounded-xl font-bold border cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 shadow-xs ${
                 userRole === "teacher"
                   ? "bg-fuchsia-100 border-fuchsia-200 text-fuchsia-800"
                   : "bg-emerald-100 border-emerald-200 text-emerald-800"
               }`}
+              title="Click to toggle between Student and Teacher view"
             >
-              Role: {userRole === "student" ? "Student" : "Teacher"}
-            </div>
+              <span>Role: {userRole === "student" ? "Student" : "Teacher"}</span>
+              <span className="text-[10px] opacity-75 font-normal">⇄ Switch</span>
+            </button>
 
             {/* High-contrast Eye strain Dark / Light mode toggle switch */}
             <button
@@ -265,17 +290,33 @@ export default function App() {
               Active System Node
             </div>
 
-            <button
-              onClick={async () => {
-                localStorage.removeItem("iris_token");
-                localStorage.removeItem("iris_user");
-                setUser(null);
-              }}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs ml-2"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            {localStorage.getItem("iris_token") ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden md:inline text-xs font-semibold text-slate-600 bg-white/70 px-2.5 py-1 rounded-lg border border-slate-200">
+                  {user.email}
+                </span>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("iris_token");
+                    localStorage.removeItem("iris_user");
+                    setUser(DEFAULT_USER);
+                    setUserRole("student");
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs"
+                  title="Logout to Guest mode"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3.5 rounded-xl transition-all cursor-pointer shadow-xs text-xs active:scale-95"
+                title="Sign in with an account"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -504,6 +545,22 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Auth Modal (optional, opens when user clicks Sign In) */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="relative w-full max-w-sm">
+            <Auth
+              onLogin={(u, r) => {
+                setUser(u);
+                setUserRole(r);
+                setShowAuthModal(false);
+              }}
+              onClose={() => setShowAuthModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

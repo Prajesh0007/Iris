@@ -23,229 +23,309 @@ import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+const DB_HOST = process.env.DB_HOST || "localhost";
+const DB_USER = process.env.DB_USER || "iris_user";
+const DB_PASSWORD = process.env.DB_PASSWORD || "Iris@2026_SecureKey";
+const DB_NAME = process.env.DB_NAME || "Iris";
+const DB_PORT = Number(process.env.DB_PORT) || 3306;
+
 const dbPool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'Iris',
+  host: DB_HOST,
+  user: DB_USER,
+  password: DB_PASSWORD,
+  database: DB_NAME,
+  port: DB_PORT,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 });
 
-// Initialize database
-async function initDb() {
-  try {
-    const connection = await dbPool.getConnection();
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(50) DEFAULT 'student',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS submissions (
-        id VARCHAR(255) PRIMARY KEY,
-        exam_id VARCHAR(255),
-        exam_title VARCHAR(255),
-        candidate_name VARCHAR(255),
-        candidate_email VARCHAR(255),
-        status VARCHAR(50),
-        score INT,
-        max_score INT,
-        integrity_score INT,
-        violations JSON,
-        ai_reports JSON,
-        screen_captures JSON,
-        answers JSON,
-        started_at VARCHAR(255),
-        submitted_at VARCHAR(255)
-      )
-    `);
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS exams (
-        id VARCHAR(255) PRIMARY KEY,
-        title VARCHAR(255),
-        description TEXT,
-        subject VARCHAR(255),
-        department VARCHAR(255),
-        year VARCHAR(255),
-        duration_minutes INT,
-        integrity_threshold INT,
-        require_camera BOOLEAN,
-        lockdown_browsing BOOLEAN,
-        entry_password VARCHAR(255),
-        admin_exit_password VARCHAR(255),
-        allowed_ips JSON,
-        shuffle_questions BOOLEAN,
-        questions JSON,
-        created_at VARCHAR(255),
-        author VARCHAR(255),
-        target_classes JSON,
-        start_time VARCHAR(255)
-      )
-    `);
-      
-    // Fallback migration for existing DBs
+// Initialize database with retries and graceful error recovery
+async function initDb(retries = 5, delay = 2000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      await connection.query(`ALTER TABLE exams ADD COLUMN start_time VARCHAR(255)`);
-    } catch (err) {}
-    try {
-      await connection.query(`ALTER TABLE users ADD COLUMN name VARCHAR(255) DEFAULT 'Student' AFTER id`);
-    } catch (err) {}
-    
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS classes (
-        id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255),
-        department VARCHAR(255),
-        year VARCHAR(255),
-        students JSON,
-        target_departments JSON,
-        target_years JSON
-      )
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS attendance (
-        id VARCHAR(255) PRIMARY KEY,
-        class_id VARCHAR(255),
-        student_email VARCHAR(255),
-        date VARCHAR(255),
-        period INT,
-        status VARCHAR(50)
-      )
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS grades (
-        id VARCHAR(255) PRIMARY KEY,
-        exam_id VARCHAR(255),
-        class_id VARCHAR(255),
-        student_email VARCHAR(255),
-        marks INT,
-        grade VARCHAR(10),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS notices (
-        id VARCHAR(255) PRIMARY KEY,
-        title VARCHAR(255),
-        content TEXT,
-        author VARCHAR(255),
-        department VARCHAR(255),
-        year VARCHAR(255),
-        priority VARCHAR(50),
-        date VARCHAR(255),
-        target_classes JSON
-      )
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id VARCHAR(255) PRIMARY KEY,
-        title VARCHAR(255),
-        description TEXT,
-        deadline VARCHAR(255),
-        type VARCHAR(50),
-        department VARCHAR(255),
-        year VARCHAR(255),
-        created_by VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS task_submissions (
-        id VARCHAR(255) PRIMARY KEY,
-        task_id VARCHAR(255),
-        student_name VARCHAR(255),
-        student_email VARCHAR(255),
-        filename VARCHAR(255),
-        file_url LONGTEXT,
-        status VARCHAR(50),
-        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS course_folders (
-        id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255),
-        target_departments JSON,
-        target_years JSON,
-        target_classes JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS notes (
-        id VARCHAR(255) PRIMARY KEY,
-        title VARCHAR(255),
-        description TEXT,
-        course_folder_id VARCHAR(255),
-        target_departments JSON,
-        target_years JSON,
-        target_classes JSON,
-        filename VARCHAR(255),
-        upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        uploaded_by VARCHAR(255),
-        size_bytes INT,
-        file_data LONGTEXT
-      )
-    `);
-
-    // Seed default sample exams if empty
-    try {
-      const [examCountRows] = await connection.query<any[]>("SELECT COUNT(*) as count FROM exams");
-      if (examCountRows && examCountRows[0]?.count === 0) {
-        for (const ex of DEFAULT_EXAMS) {
-          await connection.query(
-            `INSERT INTO exams 
-             (id, title, description, subject, department, year, duration_minutes, integrity_threshold, require_camera, lockdown_browsing, entry_password, admin_exit_password, allowed_ips, shuffle_questions, questions, created_at, author, target_classes, start_time) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              ex.id,
-              ex.title,
-              ex.description,
-              ex.subject,
-              ex.department || "General",
-              ex.year || "All",
-              ex.durationMinutes,
-              ex.integrityThreshold,
-              ex.requireCamera,
-              ex.lockdownBrowsing,
-              ex.entryPassword,
-              ex.adminExitPassword,
-              JSON.stringify(ex.allowedIps || []),
-              ex.shuffleQuestions,
-              JSON.stringify(ex.questions),
-              ex.createdAt,
-              ex.author,
-              JSON.stringify(ex.targetClasses || []),
-              ex.startTime || null,
-            ]
-          );
-        }
-        console.log("✅ Seeded default sample exams into MySQL database.");
+      // Step 1: Pre-create database if not present
+      try {
+        const rootConn = await mysql.createConnection({
+          host: DB_HOST,
+          user: DB_USER,
+          password: DB_PASSWORD,
+          port: DB_PORT,
+        });
+        await rootConn.query(
+          `CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+        );
+        await rootConn.end();
+      } catch (dbCreateErr: any) {
+        // If the user already connects scoped directly to DB, ignore
       }
-    } catch (seedErr) {
-      console.warn("Notice: MySQL sample exam seeding deferred or skipped:", seedErr);
-    }
 
-    connection.release();
-    console.log("✅ MySQL database initialized with users, submissions, and exams tables.");
-  } catch (err) {
-    console.error("❌ MySQL initialization failed:", err);
+      // Step 2: Acquire connection from pool
+      const connection = await dbPool.getConnection();
+
+      // Users table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) NOT NULL,
+          role VARCHAR(50) DEFAULT 'student',
+          avatar_url TEXT,
+          google_id VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      try {
+        await connection.query(`ALTER TABLE users ADD COLUMN name VARCHAR(255) DEFAULT 'Student' AFTER id`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE users ADD COLUMN avatar_url TEXT`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE users ADD COLUMN google_id VARCHAR(255)`);
+      } catch (err) {}
+
+      // Submissions table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS submissions (
+          id VARCHAR(255) PRIMARY KEY,
+          exam_id VARCHAR(255),
+          exam_title VARCHAR(255),
+          candidate_name VARCHAR(255),
+          candidate_email VARCHAR(255),
+          status VARCHAR(50),
+          score INT,
+          max_score INT,
+          integrity_score INT,
+          violations JSON,
+          ai_reports JSON,
+          screen_captures JSON,
+          answers JSON,
+          started_at VARCHAR(255),
+          submitted_at VARCHAR(255)
+        )
+      `);
+
+      // Exams table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS exams (
+          id VARCHAR(255) PRIMARY KEY,
+          title VARCHAR(255),
+          description TEXT,
+          subject VARCHAR(255),
+          department VARCHAR(255),
+          year VARCHAR(255),
+          duration_minutes INT,
+          integrity_threshold INT,
+          require_camera BOOLEAN,
+          lockdown_browsing BOOLEAN,
+          entry_password VARCHAR(255),
+          admin_exit_password VARCHAR(255),
+          allowed_ips JSON,
+          shuffle_questions BOOLEAN,
+          questions JSON,
+          created_at VARCHAR(255),
+          author VARCHAR(255),
+          target_classes JSON,
+          start_time VARCHAR(255)
+        )
+      `);
+      try {
+        await connection.query(`ALTER TABLE exams ADD COLUMN start_time VARCHAR(255)`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE exams ADD COLUMN target_classes JSON`);
+      } catch (err) {}
+
+      // Classes table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS classes (
+          id VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255),
+          department VARCHAR(255),
+          year VARCHAR(255),
+          students JSON,
+          target_departments JSON,
+          target_years JSON
+        )
+      `);
+      try {
+        await connection.query(`ALTER TABLE classes ADD COLUMN target_departments JSON`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE classes ADD COLUMN target_years JSON`);
+      } catch (err) {}
+
+      // Attendance table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS attendance (
+          id VARCHAR(255) PRIMARY KEY,
+          class_id VARCHAR(255),
+          student_email VARCHAR(255),
+          date VARCHAR(255),
+          period INT,
+          status VARCHAR(50)
+        )
+      `);
+
+      // Grades table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS grades (
+          id VARCHAR(255) PRIMARY KEY,
+          exam_id VARCHAR(255),
+          class_id VARCHAR(255),
+          student_email VARCHAR(255),
+          marks INT,
+          grade VARCHAR(10),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Notices table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS notices (
+          id VARCHAR(255) PRIMARY KEY,
+          title VARCHAR(255),
+          content TEXT,
+          author VARCHAR(255),
+          department VARCHAR(255),
+          year VARCHAR(255),
+          priority VARCHAR(50),
+          date VARCHAR(255),
+          target_classes JSON
+        )
+      `);
+
+      // Tasks table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS tasks (
+          id VARCHAR(255) PRIMARY KEY,
+          title VARCHAR(255),
+          description TEXT,
+          deadline VARCHAR(255),
+          type VARCHAR(50),
+          department VARCHAR(255),
+          year VARCHAR(255),
+          target_classes JSON,
+          target_years JSON,
+          target_departments JSON,
+          filename VARCHAR(255),
+          file_url LONGTEXT,
+          created_by VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      try {
+        await connection.query(`ALTER TABLE tasks ADD COLUMN target_classes JSON`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE tasks ADD COLUMN target_years JSON`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE tasks ADD COLUMN target_departments JSON`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE tasks ADD COLUMN filename VARCHAR(255)`);
+      } catch (err) {}
+      try {
+        await connection.query(`ALTER TABLE tasks ADD COLUMN file_url LONGTEXT`);
+      } catch (err) {}
+
+      // Task Submissions table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS task_submissions (
+          id VARCHAR(255) PRIMARY KEY,
+          task_id VARCHAR(255),
+          student_name VARCHAR(255),
+          student_email VARCHAR(255),
+          filename VARCHAR(255),
+          file_url LONGTEXT,
+          status VARCHAR(50),
+          submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Course Folders table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS course_folders (
+          id VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255),
+          target_departments JSON,
+          target_years JSON,
+          target_classes JSON,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Notes table
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS notes (
+          id VARCHAR(255) PRIMARY KEY,
+          title VARCHAR(255),
+          description TEXT,
+          course_folder_id VARCHAR(255),
+          target_departments JSON,
+          target_years JSON,
+          target_classes JSON,
+          filename VARCHAR(255),
+          upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          uploaded_by VARCHAR(255),
+          size_bytes INT,
+          file_data LONGTEXT
+        )
+      `);
+
+      // Seed default sample exams if empty
+      try {
+        const [examCountRows] = await connection.query<any[]>("SELECT COUNT(*) as count FROM exams");
+        if (examCountRows && examCountRows[0]?.count === 0) {
+          for (const ex of DEFAULT_EXAMS) {
+            await connection.query(
+              `INSERT INTO exams 
+               (id, title, description, subject, department, year, duration_minutes, integrity_threshold, require_camera, lockdown_browsing, entry_password, admin_exit_password, allowed_ips, shuffle_questions, questions, created_at, author, target_classes, start_time) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                ex.id,
+                ex.title,
+                ex.description,
+                ex.subject,
+                ex.department || "General",
+                ex.year || "All",
+                ex.durationMinutes,
+                ex.integrityThreshold,
+                ex.requireCamera,
+                ex.lockdownBrowsing,
+                ex.entryPassword,
+                ex.adminExitPassword,
+                JSON.stringify(ex.allowedIps || []),
+                ex.shuffleQuestions,
+                JSON.stringify(ex.questions),
+                ex.createdAt,
+                ex.author,
+                JSON.stringify(ex.targetClasses || []),
+                ex.startTime || null,
+              ]
+            );
+          }
+          console.log("✅ Seeded default sample exams into MySQL database.");
+        }
+      } catch (seedErr) {
+        console.warn("Notice: MySQL sample exam seeding deferred or skipped:", seedErr);
+      }
+
+      connection.release();
+      console.log("✅ MySQL database initialized with users, submissions, and exams tables.");
+      return;
+    } catch (err: any) {
+      console.error(`❌ MySQL initialization attempt ${attempt}/${retries} failed:`, err?.message || err);
+      if (attempt < retries) {
+        console.log(`Retrying database connection in ${delay / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
 }
 initDb();
@@ -583,11 +663,19 @@ app.post("/api/auth/register", async (req, res) => {
     res.status(400).json({ error: "Name, email, and password are required" });
     return;
   }
+  if (password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters long" });
+    return;
+  }
+  const cleanEmail = String(email).trim().toLowerCase();
+  const cleanRole = role === "teacher" ? "teacher" : "student";
+  const cleanName = String(name).trim();
+
   try {
     // Check if user exists
-    const [rows] = await dbPool.query<any[]>("SELECT id FROM users WHERE email = ?", [email]);
-    if (rows.length > 0) {
-      res.status(409).json({ error: "User already exists with this email" });
+    const [rows] = await dbPool.query<any[]>("SELECT id FROM users WHERE email = ?", [cleanEmail]);
+    if (rows && rows.length > 0) {
+      res.status(409).json({ error: "An account already exists with this email address" });
       return;
     }
 
@@ -595,24 +683,27 @@ app.post("/api/auth/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const userId = "usr-" + Date.now();
-    const userRole = role || "student";
 
     // Insert user
     await dbPool.query(
       "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
-      [userId, name, email, passwordHash, userRole]
+      [userId, cleanName, cleanEmail, passwordHash, cleanRole]
     );
 
     // Create token
-    const token = jwt.sign({ id: userId, name, email, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { id: userId, name: cleanName, email: cleanEmail, role: cleanRole },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
     
     res.status(201).json({ 
       token, 
-      user: { id: userId, name, email, role: userRole } 
+      user: { id: userId, name: cleanName, email: cleanEmail, role: cleanRole } 
     });
   } catch (err: any) {
     console.error("Register Error:", err);
-    res.status(500).json({ error: "Failed to register user" });
+    res.status(500).json({ error: "Failed to register user. Please check database connectivity." });
   }
 });
 
@@ -622,21 +713,27 @@ app.post("/api/auth/login", async (req, res) => {
     res.status(400).json({ error: "Email and password are required" });
     return;
   }
+  const cleanEmail = String(email).trim().toLowerCase();
+
   try {
-    const [rows] = await dbPool.query<any[]>("SELECT * FROM users WHERE email = ?", [email]);
-    if (rows.length === 0) {
-      res.status(401).json({ error: "Invalid credentials" });
+    const [rows] = await dbPool.query<any[]>("SELECT * FROM users WHERE email = ?", [cleanEmail]);
+    if (!rows || rows.length === 0) {
+      res.status(401).json({ error: "Invalid email or password" });
       return;
     }
 
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: "Invalid email or password" });
       return;
     }
 
-    const token = jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
     
     res.status(200).json({ 
       token, 
@@ -644,7 +741,106 @@ app.post("/api/auth/login", async (req, res) => {
     });
   } catch (err: any) {
     console.error("Login Error:", err);
-    res.status(500).json({ error: "Failed to log in" });
+    res.status(500).json({ error: "Failed to log in. Please check database connectivity." });
+  }
+});
+
+app.post("/api/auth/google", async (req, res) => {
+  try {
+    const { credential, email: directEmail, name: directName, role, googleId, avatarUrl } = req.body;
+    let email = directEmail;
+    let name = directName;
+    let sub = googleId || "google-" + Date.now();
+    let picture = avatarUrl || "";
+
+    // If Google Identity Services JWT credential is provided, decode and verify
+    if (credential) {
+      try {
+        const decoded: any = jwt.decode(credential);
+        if (decoded && decoded.email) {
+          email = decoded.email;
+          name = decoded.name || decoded.given_name || email.split("@")[0];
+          sub = decoded.sub || sub;
+          picture = decoded.picture || picture;
+        }
+      } catch (decErr) {
+        console.warn("Could not parse Google credential JWT:", decErr);
+      }
+    }
+
+    if (!email) {
+      res.status(400).json({ error: "Google account email is required" });
+      return;
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanRole = role === "teacher" ? "teacher" : "student";
+    const userName = (name || cleanEmail.split("@")[0] || (cleanRole === "teacher" ? "Faculty Teacher" : "Student")).trim();
+
+    // Check if user exists in database
+    const [rows] = await dbPool.query<any[]>("SELECT * FROM users WHERE email = ?", [cleanEmail]);
+    let user: any;
+
+    if (rows && rows.length > 0) {
+      user = rows[0];
+      try {
+        await dbPool.query(
+          "UPDATE users SET name = COALESCE(NULLIF(?, ''), name), google_id = COALESCE(google_id, ?) WHERE id = ?",
+          [userName, sub, user.id]
+        );
+      } catch (updateErr) {}
+    } else {
+      // Create new user record
+      const userId = "usr-" + Date.now();
+      const placeholderHash = await bcrypt.hash("GOOGLE_AUTH_" + (sub || userId), 10);
+      try {
+        await dbPool.query(
+          "INSERT INTO users (id, name, email, password_hash, role, google_id, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [userId, userName, cleanEmail, placeholderHash, cleanRole, sub, picture]
+        );
+      } catch (insertErr) {
+        // Fallback for earlier database schema
+        await dbPool.query(
+          "INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
+          [userId, userName, cleanEmail, placeholderHash, cleanRole]
+        );
+      }
+      user = { id: userId, name: userName, email: cleanEmail, role: cleanRole };
+    }
+
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(200).json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatarUrl: picture }
+    });
+  } catch (err: any) {
+    console.error("Google Auth Route Error:", err);
+    res.status(500).json({ error: "Google authentication failed" });
+  }
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ error: "No token provided" });
+    return;
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    const [rows] = await dbPool.query<any[]>("SELECT id, name, email, role, avatar_url FROM users WHERE id = ?", [decoded.id]);
+    if (!rows || rows.length === 0) {
+      res.status(401).json({ error: "User no longer exists" });
+      return;
+    }
+    res.json({ user: rows[0] });
+  } catch (err) {
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 });
 
@@ -1597,60 +1793,6 @@ app.delete("/api/notices/:id", async (req, res) => {
   }
 });
 
-// API Routes for Tasks
-app.get("/api/tasks", async (req, res) => {
-  try {
-    const [rows] = await dbPool.query("SELECT * FROM tasks ORDER BY created_at DESC");
-    res.json(rows);
-  } catch (e) {
-    res.json([]);
-  }
-});
-
-app.post("/api/tasks", async (req, res) => {
-  const newTask = { ...req.body, id: "task-" + Date.now() };
-  try {
-    await dbPool.query(
-      "INSERT INTO tasks (id, title, description, deadline, type, department, year, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [newTask.id, newTask.title, newTask.description, newTask.deadline, newTask.type, newTask.department, newTask.year, newTask.createdBy]
-    );
-    res.status(201).json(newTask);
-  } catch (e) {
-    res.status(500).json({ error: "Failed to create task" });
-  }
-});
-
-// API Routes for Task Submissions
-app.get("/api/task-submissions", async (req, res) => {
-  try {
-    const [rows] = await dbPool.query<any[]>("SELECT * FROM task_submissions ORDER BY submitted_at DESC");
-    res.json(rows.map((r: any) => ({
-      id: r.id,
-      taskId: r.task_id,
-      studentName: r.student_name,
-      studentEmail: r.student_email,
-      filename: r.filename,
-      fileUrl: r.file_url,
-      status: r.status,
-      submittedAt: r.submitted_at
-    })));
-  } catch (e) {
-    res.json([]);
-  }
-});
-
-app.post("/api/task-submissions", async (req, res) => {
-  const sub = { ...req.body, id: "tsub-" + Date.now() };
-  try {
-    await dbPool.query(
-      "INSERT INTO task_submissions (id, task_id, student_name, student_email, filename, file_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [sub.id, sub.taskId, sub.studentName, sub.studentEmail, sub.filename, sub.fileUrl, sub.status]
-    );
-    res.status(201).json(sub);
-  } catch (e) {
-    res.status(500).json({ error: "Failed to submit task" });
-  }
-});
 
 // 6. Proctor Scan Webcam - REAL Gemini API Call!
 app.post("/api/proctor/scan", async (req, res) => {

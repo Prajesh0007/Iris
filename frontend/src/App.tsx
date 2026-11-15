@@ -34,26 +34,20 @@ import { Auth } from "./components/Auth";
 import { User } from "./types";
 import NotificationsPopover from "./components/NotificationsPopover";
 
-const DEFAULT_USER: User = {
-  id: "guest-student-001",
-  app_metadata: {},
-  user_metadata: { role: "student", full_name: "Student Candidate" },
-  aud: "authenticated",
-  created_at: new Date().toISOString(),
-  email: "student@university.edu",
-  role: "authenticated",
-};
-
 export default function App() {
-  const [user, setUser] = useState<User>(() => {
+  const [user, setUser] = useState<User | null>(() => {
+    const token = localStorage.getItem("iris_token");
     const storedUser = localStorage.getItem("iris_user");
-    if (storedUser) {
+    if (token && storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
         return {
           id: parsed.id,
           app_metadata: {},
-          user_metadata: { role: parsed.role, full_name: parsed.name || "Student Candidate" },
+          user_metadata: {
+            role: parsed.role,
+            full_name: parsed.name || (parsed.role === "teacher" ? "Faculty Teacher" : "Student Candidate"),
+          },
           aud: "authenticated",
           created_at: new Date().toISOString(),
           email: parsed.email,
@@ -64,23 +58,11 @@ export default function App() {
         localStorage.removeItem("iris_user");
       }
     }
-    return DEFAULT_USER;
+    return null;
   });
 
-  const [userRole, setUserRole] = useState<"student" | "teacher">(() => {
-    const storedUser = localStorage.getItem("iris_user");
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed.role === "teacher" || parsed.role === "student") {
-          return parsed.role;
-        }
-      } catch (e) {}
-    }
-    return "student";
-  });
-
-  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const userRole: "student" | "teacher" =
+    user?.user_metadata?.role === "teacher" ? "teacher" : "student";
   const [page, setPage] = useState<
     "portal" | "taking" | "submitted" | "teacher-logs"
   >("portal");
@@ -205,6 +187,16 @@ export default function App() {
     (s) => s.id === completedSubmissionId,
   );
 
+  if (!user) {
+    return (
+      <Auth
+        onLogin={(authenticatedUser) => {
+          setUser(authenticatedUser);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50 text-slate-800 selection:bg-indigo-150/75">
       {/* Background soft pastel glowing glass blobs */}
@@ -230,31 +222,20 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3.5 text-xs font-semibold text-slate-900">
-            {/* Interactive Role Switcher Button */}
-            <button
-              onClick={() => {
-                const nextRole = userRole === "student" ? "teacher" : "student";
-                setUserRole(nextRole);
-                setUser((prev) => ({
-                  ...prev,
-                  user_metadata: {
-                    ...prev.user_metadata,
-                    role: nextRole,
-                    full_name: nextRole === "teacher" ? "Prof. Dumbledore" : "Student Candidate",
-                  },
-                  email: nextRole === "teacher" ? "teacher@university.edu" : "student@university.edu",
-                }));
-              }}
-              className={`py-2 px-3.5 rounded-xl font-bold border cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 shadow-xs ${
+            {/* Authenticated Identity Pill */}
+            <div
+              className={`py-2 px-3.5 rounded-xl font-bold border flex items-center gap-2 shadow-xs ${
                 userRole === "teacher"
-                  ? "bg-fuchsia-100 border-fuchsia-200 text-fuchsia-800"
-                  : "bg-emerald-100 border-emerald-200 text-emerald-800"
+                  ? "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-800"
+                  : "bg-indigo-50 border-indigo-200 text-indigo-800"
               }`}
-              title="Click to toggle between Student and Teacher view"
+              title={`Authenticated as ${userRole === "teacher" ? "Faculty Teacher" : "Student Candidate"}`}
             >
-              <span>Role: {userRole === "student" ? "Student" : "Teacher"}</span>
-              <span className="text-[10px] opacity-75 font-normal">⇄ Switch</span>
-            </button>
+              <span>{userRole === "teacher" ? "🏫 Faculty Desk" : "🎓 Student Portal"}</span>
+              <span className="text-[10px] opacity-60 font-semibold hidden md:inline">
+                ({user.user_metadata?.full_name || user.email})
+              </span>
+            </div>
 
             {/* High-contrast Eye strain Dark / Light mode toggle switch */}
             <button
@@ -290,33 +271,24 @@ export default function App() {
               Active System Node
             </div>
 
-            {localStorage.getItem("iris_token") ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden md:inline text-xs font-semibold text-slate-600 bg-white/70 px-2.5 py-1 rounded-lg border border-slate-200">
-                  {user.email}
-                </span>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem("iris_token");
-                    localStorage.removeItem("iris_user");
-                    setUser(DEFAULT_USER);
-                    setUserRole("student");
-                  }}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs"
-                  title="Logout to Guest mode"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
+            {/* User Session & Logout */}
+            <div className="flex items-center gap-2">
+              <span className="hidden lg:inline text-xs font-semibold text-slate-600 bg-white/70 px-2.5 py-1 rounded-lg border border-slate-200">
+                {user.email}
+              </span>
               <button
-                onClick={() => setShowAuthModal(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3.5 rounded-xl transition-all cursor-pointer shadow-xs text-xs active:scale-95"
-                title="Sign in with an account"
+                onClick={() => {
+                  localStorage.removeItem("iris_token");
+                  localStorage.removeItem("iris_user");
+                  setUser(null);
+                  setPage("portal");
+                }}
+                className="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs border border-slate-200 hover:border-rose-200"
+                title="Sign out of Iris"
               >
-                Sign In
+                <LogOut className="h-4 w-4" />
               </button>
-            )}
+            </div>
           </div>
         </div>
       </header>
@@ -545,22 +517,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* Auth Modal (optional, opens when user clicks Sign In) */}
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-[fadeIn_0.2s_ease-out]">
-          <div className="relative w-full max-w-sm">
-            <Auth
-              onLogin={(u, r) => {
-                setUser(u);
-                setUserRole(r);
-                setShowAuthModal(false);
-              }}
-              onClose={() => setShowAuthModal(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -5,9 +5,9 @@ dotenv.config({ path: [".env.local", ".env"] });
 
 const dbPool = createPool({
   host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "",
-  database: process.env.DB_NAME || "iris_db",
+  user: process.env.DB_USER || "iris_user",
+  password: process.env.DB_PASSWORD || "Iris@2026_SecureKey",
+  database: process.env.DB_NAME || "Iris",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

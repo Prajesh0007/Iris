@@ -5,7 +5,12 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    root: __dirname,
     plugins: [react(), tailwindcss()],
+    build: {
+      outDir: path.resolve(__dirname, 'dist'),
+      emptyOutDir: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -28,6 +28,7 @@ import {
   COMPANY_TRACKS,
   ROLE_TRACKS,
   MOCK_INTERVIEW_QUESTIONS,
+  getStudentInterviewQuestions,
 } from "./data/interviewData.js";
 
 const DB_HOST = process.env.DB_HOST || "localhost";
@@ -302,6 +303,23 @@ async function initDb(retries = 5, delay = 2000) {
           transcript JSON,
           feedback JSON,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Real-Time Exam Autosave table (Continuous Sync & Auto-Recovery)
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS exam_autosaves (
+          id VARCHAR(255) PRIMARY KEY,
+          exam_id VARCHAR(255) NOT NULL,
+          candidate_email VARCHAR(255) NOT NULL,
+          candidate_name VARCHAR(255) NOT NULL,
+          answers JSON,
+          violations JSON,
+          ai_reports JSON,
+          integrity_score INT,
+          time_left_seconds INT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_attempt (exam_id, candidate_email)
         )
       `);
 
@@ -683,6 +701,13 @@ function simulateCodeExecution(
 
 // Authentication Endpoints
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_iris_jwt_key_2026';
+
+app.get("/api/config", (_req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "",
+    nodeEnv: process.env.NODE_ENV || "production",
+  });
+});
 
 app.post("/api/auth/register", async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -1233,6 +1258,13 @@ app.post("/api/submissions", async (req, res) => {
     } catch (e) {
       console.error("MySQL POST submission failed", e);
     }
+
+    try {
+      await dbPool.query(
+        "DELETE FROM exam_autosaves WHERE exam_id = ? AND candidate_email = ?",
+        [newSubmission.examId, newSubmission.candidateEmail]
+      );
+    } catch (cleanErr) {}
 
     res.status(201).json(newSubmission);
   } catch (err: any) {
@@ -1861,7 +1893,147 @@ app.post("/api/proctor/scan", async (req, res) => {
 });
 
 // ==========================================
-// 8. Interview Preparation & AI Mock Interview Suite
+// 8. Real-Time Exam Autosave & Continuous Recovery
+// ==========================================
+
+// Save student exam progress in real-time to MySQL
+app.post("/api/exams/autosave", async (req, res) => {
+  try {
+    const {
+      examId,
+      candidateEmail,
+      candidateName,
+      answers,
+      violations,
+      aiReports,
+      integrityScore,
+      timeLeftSeconds,
+    } = req.body;
+
+    if (!examId || !candidateEmail) {
+      res.status(400).json({ error: "Exam ID and candidate email are required" });
+      return;
+    }
+
+    const autosaveId = `as_${examId}_${candidateEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
+
+    await dbPool.query(
+      `INSERT INTO exam_autosaves 
+       (id, exam_id, candidate_email, candidate_name, answers, violations, ai_reports, integrity_score, time_left_seconds)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         answers = VALUES(answers),
+         violations = VALUES(violations),
+         ai_reports = VALUES(ai_reports),
+         integrity_score = VALUES(integrity_score),
+         time_left_seconds = VALUES(time_left_seconds),
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        autosaveId,
+        examId,
+        candidateEmail,
+        candidateName || "Student Candidate",
+        JSON.stringify(answers || []),
+        JSON.stringify(violations || []),
+        JSON.stringify(aiReports || []),
+        Number(integrityScore) || 100,
+        Number(timeLeftSeconds) || 0,
+      ]
+    );
+
+    res.json({ success: true, savedAt: new Date().toISOString() });
+  } catch (err: any) {
+    console.error("Autosave database error:", err);
+    res.status(500).json({ error: "Failed to persist autosave to database", details: err.message });
+  }
+});
+
+// Retrieve previously active autosave for seamless crash/refresh recovery
+app.get("/api/exams/autosave/:examId/:email", async (req, res) => {
+  try {
+    const { examId, email } = req.params;
+    const [rows] = await dbPool.query<any[]>(
+      "SELECT * FROM exam_autosaves WHERE exam_id = ? AND candidate_email = ? LIMIT 1",
+      [examId, email]
+    );
+
+    if (!rows || rows.length === 0) {
+      res.json({ exists: false, autosave: null });
+      return;
+    }
+
+    const row = rows[0];
+    res.json({
+      exists: true,
+      autosave: {
+        answers: typeof row.answers === "string" ? JSON.parse(row.answers) : row.answers,
+        violations: typeof row.violations === "string" ? JSON.parse(row.violations) : row.violations,
+        aiReports: typeof row.ai_reports === "string" ? JSON.parse(row.ai_reports) : row.ai_reports,
+        integrityScore: row.integrity_score,
+        timeLeftSeconds: row.time_left_seconds,
+        updatedAt: row.updated_at,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch exam autosave" });
+  }
+});
+
+// Delete autosave once exam is finalized
+app.delete("/api/exams/autosave/:examId/:email", async (req, res) => {
+  try {
+    const { examId, email } = req.params;
+    await dbPool.query("DELETE FROM exam_autosaves WHERE exam_id = ? AND candidate_email = ?", [
+      examId,
+      email,
+    ]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to clear autosave" });
+  }
+});
+
+// Periodic background sweeper: Auto-finalizes student exams if time expired or disconnected
+setInterval(async () => {
+  try {
+    const [staleAutosaves] = await dbPool.query<any[]>(
+      `SELECT * FROM exam_autosaves WHERE time_left_seconds <= 5 AND updated_at < NOW() - INTERVAL 1 MINUTE LIMIT 10`
+    );
+    if (staleAutosaves && staleAutosaves.length > 0) {
+      for (const auto of staleAutosaves) {
+        const subId = `sub_auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const answers = typeof auto.answers === "string" ? JSON.parse(auto.answers) : auto.answers;
+        const violations = typeof auto.violations === "string" ? JSON.parse(auto.violations) : auto.violations;
+        const aiReports = typeof auto.ai_reports === "string" ? JSON.parse(auto.ai_reports) : auto.ai_reports;
+        const totalQ = Array.isArray(answers) ? answers.length : 0;
+        const score = totalQ > 0 ? Math.round((answers.filter((a: any) => a.isCorrect).length / totalQ) * 100) : 0;
+
+        await dbPool.query(
+          `INSERT INTO submissions (id, exam_id, candidate_name, candidate_email, score, integrity_score, answers, violations, ai_reports, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            subId,
+            auto.exam_id,
+            auto.candidate_name,
+            auto.candidate_email,
+            score,
+            auto.integrity_score || 100,
+            JSON.stringify(answers || []),
+            JSON.stringify(violations || []),
+            JSON.stringify(aiReports || []),
+          ]
+        );
+        await dbPool.query("DELETE FROM exam_autosaves WHERE id = ?", [auto.id]);
+        console.log(`[Auto-Submit] Successfully auto-submitted expired exam for ${auto.candidate_email} (${auto.exam_id})`);
+      }
+    }
+  } catch (sweepErr) {
+    // Ignore transient sweep notice
+  }
+}, 30000);
+
+// ==========================================
+// 9. Interview Preparation & AI Mock Interview Suite
 // ==========================================
 
 // Catalog of curated topics, company tracks, role roadmaps, and mock interview questions
@@ -1874,10 +2046,20 @@ app.get("/api/interview/tracks", (_req, res) => {
   });
 });
 
+// Fetch customized mock questions tailored for individual student and role
+app.get("/api/interview/questions", (req, res) => {
+  const { email, role, round } = req.query;
+  const studentEmail = (email as string) || "student@university.edu";
+  const userRole = (role as string) || "Fullstack Engineer";
+  const roundType = (round as any) || "comprehensive";
+  const questions = getStudentInterviewQuestions(studentEmail, userRole, roundType);
+  res.json(questions);
+});
+
 // Evaluate candidate response using intelligent rubric scoring
 app.post("/api/interview/evaluate", async (req, res) => {
   try {
-    const { questionId, question, answer, roundType, role, company } = req.body;
+    const { questionId, question, answer, roundType, role, company, category } = req.body;
     if (!answer || answer.trim().length === 0) {
       res.status(400).json({ error: "Candidate response cannot be empty." });
       return;
@@ -1888,103 +2070,117 @@ app.post("/api/interview/evaluate", async (req, res) => {
 
     // Find question context if available
     const matchedQ = MOCK_INTERVIEW_QUESTIONS.find((q) => q.id === questionId);
+    const qCategory = category || matchedQ?.category || "technical";
 
-    // Dynamic scoring calculation based on length, keywords, STAR methodology, and technical depth
     let score = 50;
     const strengths: string[] = [];
     const improvements: string[] = [];
 
     // Length and completeness criteria
-    if (wordCount >= 60) {
+    if (wordCount >= 45) {
       score += 15;
       strengths.push("Provided comprehensive depth and detailed elaboration.");
-    } else if (wordCount >= 30) {
+    } else if (wordCount >= 20) {
       score += 8;
-      strengths.push("Direct and concise response structure.");
+      strengths.push("Clear, concise, and structured delivery.");
     } else {
-      score -= 15;
-      improvements.push("Response was too brief. Expand with concrete examples and rationale.");
+      score -= 10;
+      improvements.push("Response was brief. Expand with concrete rationale, examples, or step derivations.");
     }
 
-    if (roundType === "technical") {
-      // Technical domain heuristics
-      const techKeywords = [
+    // Category-specific intelligence evaluation
+    if (qCategory === "coding" || qCategory === "dsa") {
+      const algoKeywords = [
         "complexity", "o(n", "o(1", "time complexity", "space complexity",
-        "hashmap", "array", "pointer", "tree", "graph", "cache", "redis",
-        "database", "index", "concurrency", "microservice", "asynchronous",
-        "latency", "throughput", "scalable", "sharding", "edge case", "boundary"
+        "hashmap", "array", "pointer", "tree", "graph", "stack", "queue",
+        "binary search", "recursion", "memoization", "dynamic programming",
+        "in-place", "edge case", "null", "empty"
       ];
-      const foundKeywords = techKeywords.filter((k) =>
-        trimmedAnswer.toLowerCase().includes(k)
-      );
-
-      if (foundKeywords.length >= 3) {
-        score += 20;
-        strengths.push(`Strong technical vocabulary: demonstrated mastery of [${foundKeywords.slice(0, 4).join(", ")}].`);
-      } else if (foundKeywords.length >= 1) {
-        score += 10;
-        strengths.push(`Referenced core technical concepts like [${foundKeywords[0]}].`);
+      const found = algoKeywords.filter(k => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
+        strengths.push(`Strong algorithmic analysis: highlighted concepts like [${found.slice(0, 3).join(", ")}].`);
+      } else if (found.length >= 1) {
+        score += 12;
+        strengths.push(`Addressed core algorithmic concepts: ${found[0]}.`);
       } else {
-        improvements.push("Mention time/space complexity tradeoffs (Big-O notation) and edge-case handling.");
+        improvements.push("Explicitly state Big-O Time & Space complexity and consider boundary edge cases.");
       }
-
-      if (/edge case|null|empty|overflow|duplicate/i.test(trimmedAnswer)) {
-        score += 10;
-        strengths.push("Proactively considered edge cases and error bounds.");
+    } else if (qCategory === "system_design") {
+      const sysKeywords = [
+        "cache", "redis", "sharding", "replication", "load balancer", "gateway",
+        "throughput", "latency", "cap theorem", "message queue", "kafka", "horizontal",
+        "failover", "consistency", "token bucket", "rate limit"
+      ];
+      const found = sysKeywords.filter(k => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
+        strengths.push(`High-level architectural acumen: incorporated [${found.slice(0, 3).join(", ")}].`);
       } else {
-        improvements.push("Discuss boundary validation, such as empty inputs or high concurrent loads.");
+        improvements.push("Address bottleneck resolution, caching layers, and database partitioning strategies.");
+      }
+    } else if (qCategory === "os" || qCategory === "networking") {
+      const osNetKeywords = [
+        "thread", "process", "context switch", "deadlock", "mutex", "semaphore",
+        "virtual memory", "paging", "tlb", "tcp", "udp", "handshake", "socket",
+        "quic", "http", "time_wait", "syn", "ack", "packet"
+      ];
+      const found = osNetKeywords.filter(k => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
+        strengths.push(`Accurate systems knowledge: properly referenced [${found.slice(0, 3).join(", ")}].`);
+      } else {
+        improvements.push("Incorporate precise kernel or protocol lifecycle mechanics.");
+      }
+    } else if (qCategory === "numerical") {
+      const numKeywords = ["rate", "probability", "total", "ratio", "fraction", "formula", "hours", "percent", "equals", "="];
+      const found = numKeywords.filter(k => trimmedAnswer.toLowerCase().includes(k));
+      if (/\d+/.test(trimmedAnswer)) {
+        score += 15;
+        strengths.push("Provided concrete quantitative derivation and numerical output.");
+      }
+      if (found.length >= 2) {
+        score += 15;
+        strengths.push("Showed clear step-by-step mathematical reasoning.");
+      } else {
+        improvements.push("Write out the intermediate arithmetic formulas and verify unit calculations.");
       }
     } else {
-      // Behavioral / HR domain heuristics (STAR method)
-      const starKeywords = [
-        "situation", "task", "action", "result", "team", "learned",
-        "outcome", "impact", "handled", "metric", "improved", "deadline"
-      ];
-      const foundStar = starKeywords.filter((k) =>
-        trimmedAnswer.toLowerCase().includes(k)
-      );
-
-      if (foundStar.length >= 3) {
-        score += 20;
+      // HR & Behavioral (STAR format)
+      const starKeywords = ["situation", "task", "action", "result", "team", "learned", "impact", "delivered", "handled"];
+      const found = starKeywords.filter(k => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
         strengths.push("Structured narrative aligns effectively with the STAR (Situation, Task, Action, Result) method.");
       } else {
         improvements.push("Structure your story using the STAR framework: Situation, Task, Action, and measurable Result.");
       }
-
-      if (/learned|impact|metric|percent|reduced|increased/i.test(trimmedAnswer)) {
-        score += 15;
-        strengths.push("Articulated measurable business impact and reflective learnings.");
-      } else {
-        improvements.push("Quantify the positive result (e.g. reduced latency by 30%, shipped 2 days early).");
-      }
     }
 
-    // Clamp score between 38 and 98
-    const finalScore = Math.min(98, Math.max(38, score));
+    // Clamp score between 40 and 98
+    const finalScore = Math.min(98, Math.max(40, score));
 
     // Follow-up question selection
-    let followUpQuestion = "Can you walk me through how you would test this solution against production traffic spikes?";
+    let followUpQuestion = "Can you walk me through how you would test and verify this in a live production environment?";
     if (matchedQ?.sampleFollowUps && matchedQ.sampleFollowUps.length > 0) {
       const idx = Math.floor(Math.random() * matchedQ.sampleFollowUps.length);
       followUpQuestion = matchedQ.sampleFollowUps[idx];
-    } else if (roundType === "hr") {
-      followUpQuestion = "Looking back at that scenario, what would you have done differently knowing what you know now?";
     }
 
     let feedback = "";
     if (finalScore >= 85) {
-      feedback = `Excellent answer! You demonstrated great ${roundType === "technical" ? "algorithmic problem-solving and architectural clarity" : "interpersonal communication, ownership, and STAR-aligned storytelling"}.`;
+      feedback = "Outstanding response! You demonstrated strong technical depth, logical clarity, and structured delivery.";
     } else if (finalScore >= 70) {
-      feedback = `Good answer with solid fundamentals. To elevate this to a top-tier hire rating, incorporate the suggestions below.`;
+      feedback = "Good response with solid fundamentals. Incorporate the targeted suggestions below to elevate your interview rating.";
     } else {
-      feedback = `Fair attempt, but your response needs greater specificity, quantitative evidence, and structured delivery.`;
+      feedback = "Fair attempt, but your answer needs greater technical precision, concrete examples, and structured reasoning.";
     }
 
     res.json({
       score: finalScore,
       feedback,
-      strengths: strengths.length > 0 ? strengths : ["Demonstrated positive willingness to tackle the prompt."],
-      improvements: improvements.length > 0 ? improvements : ["Continue practicing timed verbal delivery."],
+      strengths: strengths.length > 0 ? strengths : ["Demonstrated positive willingness to tackle the challenge."],
+      improvements: improvements.length > 0 ? improvements : ["Continue refining timed verbal and code delivery."],
       followUpQuestion,
     });
   } catch (err: any) {

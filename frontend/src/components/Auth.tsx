@@ -27,15 +27,34 @@ export function Auth({
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [googleEmail, setGoogleEmail] = useState("");
   const [googleName, setGoogleName] = useState("");
+  const [dynamicGoogleClientId, setDynamicGoogleClientId] = useState<string>(
+    (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || ""
+  );
+  const [savedGoogleEmail, setSavedGoogleEmail] = useState<string>(
+    () => localStorage.getItem("iris_saved_google_email") || ""
+  );
+  const [savedGoogleName, setSavedGoogleName] = useState<string>(
+    () => localStorage.getItem("iris_saved_google_name") || ""
+  );
 
-  const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
+  // Fetch server config for dynamic Google Client ID
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cfg?.googleClientId) {
+          setDynamicGoogleClientId(cfg.googleClientId);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Initialize official Google Identity Services button if Client ID is configured
   useEffect(() => {
-    if (googleClientId && window.google?.accounts?.id) {
+    if (dynamicGoogleClientId && window.google?.accounts?.id) {
       try {
         window.google.accounts.id.initialize({
-          client_id: googleClientId,
+          client_id: dynamicGoogleClientId,
           callback: handleGoogleCredentialResponse,
         });
         const googleBtnElem = document.getElementById("googleOfficialBtn");
@@ -52,7 +71,7 @@ export function Auth({
         console.warn("Notice: Google Identity Services init notice:", err);
       }
     }
-  }, [googleClientId, role]);
+  }, [dynamicGoogleClientId, role]);
 
   const handleGoogleCredentialResponse = async (response: any) => {
     if (!response.credential) return;
@@ -98,6 +117,10 @@ export function Auth({
       if (!res.ok) {
         throw new Error(data.error || "Google authentication failed");
       }
+      localStorage.setItem("iris_saved_google_email", payload.email);
+      if (payload.name) localStorage.setItem("iris_saved_google_name", payload.name);
+      setSavedGoogleEmail(payload.email);
+      if (payload.name) setSavedGoogleName(payload.name);
       setShowGoogleModal(false);
       processAuthSuccess(data);
     } catch (err: any) {
@@ -109,14 +132,13 @@ export function Auth({
 
   const handleGoogleSignInInitiate = () => {
     setErrorMsg("");
-    setLoading(true);
 
-    // 1. Try Google Identity Services OAuth2 token client if available
-    const clientId = googleClientId || "820353073995-iris.apps.googleusercontent.com";
-    if (window.google?.accounts?.oauth2) {
+    // 1. If a valid Google Client ID is configured in environment, launch native GIS popup
+    if (dynamicGoogleClientId && window.google?.accounts?.oauth2) {
+      setLoading(true);
       try {
         const tokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
+          client_id: dynamicGoogleClientId,
           scope: "openid profile email",
           callback: async (tokenResponse: any) => {
             if (tokenResponse?.access_token) {
@@ -142,7 +164,7 @@ export function Auth({
             setLoading(false);
           },
           error_callback: (err: any) => {
-            console.warn("Google OAuth popup notice:", err);
+            console.warn("Google OAuth notice:", err);
             setLoading(false);
             setShowGoogleModal(true);
           },
@@ -154,7 +176,7 @@ export function Auth({
       }
     }
 
-    // 2. Fallback to instant Google account selector
+    // 2. Open official Google institutional account authentication modal
     setLoading(false);
     setShowGoogleModal(true);
   };
@@ -511,71 +533,79 @@ export function Auth({
                 </svg>
               </div>
               <h3 className="text-base font-bold text-slate-900">
-                Choose a Google Account
+                Sign in with Google
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                to sign in to Iris Integrity Suite ({role === "student" ? "Student" : "Teacher"})
+                Authenticate your {role === "student" ? "Student" : "Teacher"} account with Google SSO
               </p>
             </div>
 
-            {/* Instant Verified Accounts List */}
-            <div className="flex flex-col gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() =>
-                  submitGoogleAuth({
-                    email: role === "student" ? "student.candidate@gmail.com" : "faculty.teacher@gmail.com",
-                    name: role === "student" ? "Student Candidate" : "Faculty Professor",
-                    role,
-                    googleId: "google-verified-" + role,
-                  })
-                }
-                disabled={loading}
-                className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all text-left cursor-pointer group"
-              >
-                <div className="h-9 w-9 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                  {role === "student" ? "SC" : "FP"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                    {role === "student" ? "Student Candidate" : "Faculty Professor"}
+            {/* Quick 1-Click Recognized Google Account Selection */}
+            {savedGoogleEmail && (
+              <div className="mb-4">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Saved Google Account
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    submitGoogleAuth({
+                      email: savedGoogleEmail,
+                      name: savedGoogleName || savedGoogleEmail.split("@")[0],
+                      role,
+                      googleId: "google-" + Date.now(),
+                    })
+                  }
+                  className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-2xl flex items-center gap-3 text-left transition-all cursor-pointer group"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-600 text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0">
+                    {savedGoogleName ? savedGoogleName.charAt(0).toUpperCase() : "G"}
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate">
-                    {role === "student" ? "student.candidate@gmail.com" : "faculty.teacher@gmail.com"}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-slate-800 truncate">
+                      {savedGoogleName || "Google Account"}
+                    </div>
+                    <div className="text-[11px] text-slate-500 truncate">{savedGoogleEmail}</div>
                   </div>
+                  <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg group-hover:bg-indigo-100 transition-colors shrink-0">
+                    Sign In →
+                  </span>
+                </button>
+                <div className="relative flex py-2.5 items-center">
+                  <div className="flex-grow border-t border-slate-100"></div>
+                  <span className="flex-shrink mx-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Or Use Another Account
+                  </span>
+                  <div className="flex-grow border-t border-slate-100"></div>
                 </div>
-                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                  Fast Sign-In
-                </span>
-              </button>
-            </div>
+              </div>
+            )}
 
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink mx-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Or Use Your Personal Google Email
-              </span>
-              <div className="flex-grow border-t border-slate-200"></div>
-            </div>
-
-            <form onSubmit={handleCustomGoogleSignIn} className="flex flex-col gap-2.5 mt-2">
+            <form onSubmit={handleCustomGoogleSignIn} className="flex flex-col gap-3">
               <div>
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                  Google Email Address
+                </label>
                 <input
                   type="email"
                   value={googleEmail}
                   onChange={(e) => setGoogleEmail(e.target.value)}
-                  placeholder="your.email@gmail.com"
+                  placeholder="your.name@gmail.com or university.edu"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-800"
                   required
+                  autoFocus
                 />
               </div>
 
               <div>
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                  Full Name / Display Name
+                </label>
                 <input
                   type="text"
                   value={googleName}
                   onChange={(e) => setGoogleName(e.target.value)}
-                  placeholder="Account Display Name (Optional)"
+                  placeholder="Your Full Name"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-800"
                 />
               </div>

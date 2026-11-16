@@ -734,65 +734,301 @@ var ROLE_TRACKS = [
   }
 ];
 var MOCK_INTERVIEW_QUESTIONS = [
-  // Technical Questions
+  // 1. CODING CHALLENGES (With live execution starter code and test cases)
   {
-    id: "tech-q1",
+    id: "code-q1",
     type: "technical",
-    role: "Frontend Engineer",
-    question: "Can you explain how the JavaScript Event Loop works, specifically distinguishing between the Call Stack, Microtask Queue (Promises), and Macrotask Queue (setTimeout)?",
-    context: "Fundamental runtime behavior in JavaScript engines (V8).",
+    category: "coding",
+    role: "Fullstack / Backend / Frontend",
+    difficulty: "medium",
+    question: "Coding Challenge: Given an array of integers nums and an integer target, write a function twoSum(nums, target) that returns the indices of the two numbers such that they add up to target. You may assume each input has exactly one solution and you may not use the same element twice.",
+    context: "Fundamental algorithmic coding problem testing hash map lookup optimization vs quadratic brute force.",
+    spokenPrompt: "Let's begin with a coding problem. I've placed the boilerplate in your live editor. Can you implement twoSum in optimal O(N) time using a hash map?",
+    starterCode: `function twoSum(nums, target) {
+  const map = new Map();
+  for (let i = 0; i < nums.length; i++) {
+    const complement = target - nums[i];
+    if (map.has(complement)) {
+      return [map.get(complement), i];
+    }
+    map.set(nums[i], i);
+  }
+  return [];
+}`,
+    testCases: [
+      { input: "[2, 7, 11, 15], 9", expectedOutput: "[0, 1]" },
+      { input: "[3, 2, 4], 6", expectedOutput: "[1, 2]" },
+      { input: "[3, 3], 6", expectedOutput: "[0, 1]" }
+    ],
     sampleFollowUps: [
-      "If we have a Promise that resolves immediately inside a setTimeout callback, in what exact sequence do they log?",
-      "How does requestAnimationFrame fit into this execution cycle compared to microtasks?"
+      "What is the space complexity if all elements are distinct?",
+      "How would your approach change if the array was already sorted in non-decreasing order?"
     ],
     evaluationCriteria: [
-      "Mentions single-threaded execution model of JavaScript",
-      "Correctly identifies that Microtasks always execute until empty before the next Macrotask",
-      "Accurately explains event loop phases"
+      "Uses a Hash Map / Dictionary for O(1) complement lookups",
+      "Achieves O(N) time and O(N) space complexity",
+      "Correctly handles zero, negative numbers, and duplicate values"
     ],
-    modelAnswerOutline: "JavaScript runs on a single-threaded event loop. Code executes on the Call Stack. When asynchronous tasks trigger, macrotasks (setTimeout, I/O) go to the Macrotask queue, while microtasks (Promise.then, queueMicrotask, MutationObserver) go to the Microtask queue. When the call stack empties, the event loop drains ALL microtasks first before executing the single next macrotask."
+    modelAnswerOutline: "We iterate through the array once. For each element num at index i, calculate complement = target - num. If complement exists in map, return [map.get(complement), i]. Otherwise insert num with index i into map. Time complexity: O(N), Space complexity: O(N)."
   },
   {
-    id: "tech-q2",
+    id: "code-q2",
     type: "technical",
-    role: "Backend & Systems Engineer",
-    question: "Suppose our primary MySQL database is experiencing 99% CPU utilization due to heavy read traffic. What architectural steps would you take to remediate this without disrupting user traffic?",
-    context: "High-scale production database optimization scenario.",
+    category: "coding",
+    role: "Frontend / Fullstack Engineer",
+    difficulty: "medium",
+    question: "Coding Challenge: Write a function isValidParentheses(s) that determines if an input string containing '(', ')', '{', '}', '[' and ']' is valid. Brackets must close in the correct order and match corresponding open bracket types.",
+    context: "Stack-based algorithmic problem testing data structure selection.",
+    spokenPrompt: "Now let's test your stack mechanics. Please implement isValidParentheses in the editor and ensure it handles mismatched nested brackets.",
+    starterCode: `function isValidParentheses(s) {
+  const stack = [];
+  const map = { ')': '(', '}': '{', ']': '[' };
+  for (const char of s) {
+    if (char === '(' || char === '{' || char === '[') {
+      stack.push(char);
+    } else {
+      if (stack.pop() !== map[char]) return false;
+    }
+  }
+  return stack.length === 0;
+}`,
+    testCases: [
+      { input: '"()[]{}"', expectedOutput: "true" },
+      { input: '"(]"', expectedOutput: "false" },
+      { input: '"([{}])"', expectedOutput: "true" }
+    ],
     sampleFollowUps: [
-      "How do you handle cache invalidation when a record updates in the primary database?",
-      "What is replication lag in read replicas and how do you guarantee read-your-own-writes consistency?"
+      "How would you handle other nested token pairs like XML/HTML tags?",
+      "What if the string contains non-bracket characters?"
     ],
     evaluationCriteria: [
-      "Mentions query profiling (EXPLAIN, slow query logs)",
-      "Proposes adding Redis caching (Cache-Aside pattern)",
-      "Proposes MySQL Read Replicas with read-write splitting",
-      "Considers connection pooling and database indexing"
+      "Applies Last-In-First-Out (LIFO) stack principle",
+      "Properly checks empty stack condition upon closing bracket",
+      "Returns true only if stack is fully empty at completion"
     ],
-    modelAnswerOutline: "1. Diagnostic: Check slow query log and run EXPLAIN to verify if missing indexes cause full table scans. 2. Caching: Introduce Redis or Memcached using Cache-Aside for read-heavy entities with short TTL. 3. Read Replicas: Provision MySQL read replicas and route read traffic to replicas while directing writes to primary. 4. Connection Pooling: Ensure backend instances use pooling (e.g. HikariCP or connection pools) so idle connections don't exhaust DB worker threads."
+    modelAnswerOutline: "Initialize an empty stack. For each character, if it is an opening bracket push to stack. If it is a closing bracket, pop from stack and verify matching type. If stack is empty or type mismatches return false. After traversal, return true if stack is empty."
+  },
+  // 2. DSA (Data Structures & Algorithms)
+  {
+    id: "dsa-q1",
+    type: "technical",
+    category: "dsa",
+    role: "Software Engineer / Algorithms",
+    difficulty: "medium",
+    question: "Walk me through how you would detect a cycle in a directed graph. Compare Depth First Search (DFS) with 3-color vertex marking against Kahn's Topological Sort algorithm.",
+    context: "Graph theory, dependency resolution, and cycle detection.",
+    spokenPrompt: "Could you walk me through how cycle detection operates in directed graphs? Specifically contrast three-color DFS against Kahn's algorithm.",
+    sampleFollowUps: [
+      "In a build system like npm or Blaze, how would you report the exact circular dependency cycle back to the developer?",
+      "What is the time complexity in terms of vertices V and edges E?"
+    ],
+    evaluationCriteria: [
+      "Explains 3-color DFS state: White (unvisited), Gray (currently in recursion call stack), Black (fully processed)",
+      "Identifies that reaching a Gray node confirms a back-edge and hence a cycle",
+      "Explains Kahn's Algorithm using in-degree array: cycle exists if processed node count < total vertices V",
+      "States O(V + E) time complexity"
+    ],
+    modelAnswerOutline: "1. Three-color DFS: Nodes have 3 states: 0=unvisited, 1=visiting, 2=visited. When traversing node u, mark it 1. For each neighbor v, if v is 1, a back-edge exists (cycle). If v is 0, recurse. After exploring all neighbors, mark u as 2. 2. Kahn's Algorithm: Compute in-degree for all vertices. Push 0-in-degree vertices into a queue. Dequeue, increment counter, decrement in-degrees of neighbors. If in-degree becomes 0, push to queue. If processed count != V, a cycle exists. Time: O(V + E), Space: O(V)."
   },
   {
-    id: "tech-q3",
+    id: "dsa-q2",
     type: "technical",
-    role: "General Software Engineer",
-    question: "Walk me through how you would detect a cycle in a linked list, and how to find the exact node where the cycle begins.",
-    context: "Algorithmic question: Floyd's Tortoise and Hare Cycle-Finding Algorithm.",
+    category: "dsa",
+    role: "Backend & Systems",
+    difficulty: "hard",
+    question: "Explain the optimal approach to solve the Longest Increasing Subsequence (LIS) problem. Why does the naive DP take O(N^2) and how can we optimize it to O(N log N) using binary search (Patience Sorting)?",
+    context: "Dynamic programming and greedy binary search optimizations.",
+    spokenPrompt: "Let's explore the Longest Increasing Subsequence. How do we transition from the classical O of N squared dynamic programming to O of N log N using binary search?",
     sampleFollowUps: [
-      "What is the formal mathematical proof that fast and slow pointers will meet?",
-      "Can we do this in O(1) auxiliary space without modifying the list nodes?"
+      "Does the auxiliary tails array represent an actual valid subsequence, or solely lengths?",
+      "How would you reconstruct the actual elements of the longest sequence?"
     ],
     evaluationCriteria: [
-      "Identifies Floyd's Two-Pointer Cycle Algorithm (Slow advances 1, Fast advances 2)",
-      "Explains that after meeting point, resetting one pointer to head and moving both at 1 step locates cycle start",
-      "Correctly states time complexity is O(N) and space is O(1)"
+      "Explains dp[i] definition as length of LIS ending at index i",
+      "Explains tails array where tails[len] stores smallest tail of all increasing subsequences of length len+1",
+      "Applies binary search (bisect_left) to find placement index in O(log N)"
     ],
-    modelAnswerOutline: "Initialize slow and fast pointers to head. Move slow by 1 step, fast by 2 steps. If fast or fast.next reaches null, no cycle exists. If slow == fast, a cycle is confirmed. To find the entry node: reset slow to head, leave fast at the meeting node. Advance both pointers 1 step at a time; the node where they meet is the start of the cycle. Time complexity: O(N), Space complexity: O(1)."
+    modelAnswerOutline: "Naive DP maintains dp[i] = 1 + max(dp[j] for j < i where nums[j] < nums[i]), requiring O(N^2). We optimize to O(N log N) with patience sorting: maintain an array 'tails' where tails[i] is the smallest tail value among all increasing subsequences of length i+1. For each x in nums, binary search in tails: if x is larger than all elements, append x. Otherwise replace the first element >= x with x. The length of tails is the LIS length."
   },
-  // HR / Behavioral Questions
+  // 3. SYSTEM DESIGN
+  {
+    id: "sys-q1",
+    type: "technical",
+    category: "system_design",
+    role: "Backend / Systems Architect",
+    difficulty: "medium",
+    question: "Design a distributed Rate Limiter capable of handling 500,000 requests per second across multiple API gateway clusters. Compare the Token Bucket, Leaky Bucket, and Sliding Window Log algorithms. How would you store state with minimal latency?",
+    context: "Distributed rate limiting, concurrency, and Redis memory management.",
+    spokenPrompt: "Suppose our API Gateway needs a distributed rate limiter for half a million requests per second. Which algorithm would you choose, and how would you manage state across distributed instances?",
+    sampleFollowUps: [
+      "How do you handle race conditions when two requests from the same user hit two different API instances simultaneously?",
+      "What happens if your Redis cluster experiences a 2-second network partition?"
+    ],
+    evaluationCriteria: [
+      "Compares Token Bucket (allows bursts) vs Sliding Window Counter (smooth rate)",
+      "Proposes centralized in-memory datastore like Redis with Lua scripts for atomic execution",
+      "Considers fallback policy (fail open vs fail closed) during cache downtime",
+      "Explains memory efficiency of sliding window counter vs raw logs"
+    ],
+    modelAnswerOutline: "Architecture: Place rate limiting at API Gateway (e.g. Envoy / Nginx). Choose Token Bucket for burst allowance or Sliding Window Counter for memory efficiency. State Storage: Redis cluster with key = user_id:window_epoch. Concurrency: Use Redis EVAL with atomic Lua script to check and increment counter atomically in 1 round-trip, avoiding race conditions. Scalability: Shard Redis keys by hash(user_id). Fault Tolerance: If Redis fails, fail open to prevent blocking legitimate users while sounding alerts."
+  },
+  {
+    id: "sys-q2",
+    type: "technical",
+    category: "system_design",
+    role: "Fullstack / Cloud Engineer",
+    difficulty: "medium",
+    question: "Design a scalable URL Shortening Service (like TinyURL or Bitly) handling 100 million new URLs per month with a 100:1 read-to-write ratio. How would you generate unique short keys and ensure high read availability?",
+    context: "Distributed ID generation, Base62 encoding, and caching strategies.",
+    spokenPrompt: "Let's design a high-volume URL shortener. How do you guarantee unique short keys without collisions in a distributed multi-master setup?",
+    sampleFollowUps: [
+      "Why Base62 encoding (a-z, A-Z, 0-9) instead of MD5 or SHA256 hashing?",
+      "How do you purge expired URLs efficiently without locking database tables?"
+    ],
+    evaluationCriteria: [
+      "Calculates write QPS (~40 writes/sec) and read QPS (~4,000 reads/sec)",
+      "Proposes 64-bit unique ID generation (Snowflake or pre-allocated counter ranges)",
+      "Applies Base62 encoding (6-7 characters yields billions of unique combinations)",
+      "Introduces Redis cache for popular URLs with LRU eviction"
+    ],
+    modelAnswerOutline: "Data Model: Mapping table (id BIGINT PK, short_url VARCHAR(7), long_url TEXT, created_at, expires_at). Short Key Generation: Use distributed ID generator (Twitter Snowflake or ZooKeeper range allocation) to produce a 64-bit integer, then encode to Base62 (62^7 = 3.5 trillion keys). Cache Layer: 80-20 Pareto principle; cache top 20% of read URLs in Redis. Reads return HTTP 301 (Permanent Redirect for browser caching) or 302 (Temporary for analytics tracking). Partition DB by hash(short_url)."
+  },
+  // 4. OPERATING SYSTEMS (OS)
+  {
+    id: "os-q1",
+    type: "technical",
+    category: "os",
+    role: "Systems / Backend / Core CS",
+    difficulty: "medium",
+    question: "Explain the architectural differences between a Process and a Thread in terms of memory layout (heap, stack, data, code). What happens during a Context Switch, and why is a process context switch significantly more expensive than a thread context switch?",
+    context: "Operating system kernel abstractions, virtual memory, and MMU TLB flushing.",
+    spokenPrompt: "In operating systems, what is the precise memory separation between a process and a thread? And why does a process context switch carry a much heavier overhead?",
+    sampleFollowUps: [
+      "What is the Translation Lookaside Buffer (TLB) and why does process switching invalidate it?",
+      "How does copy-on-write (COW) optimize the fork() system call?"
+    ],
+    evaluationCriteria: [
+      "Differentiates that threads share address space (code, data, heap) but have private stack and registers",
+      "Explains context switch steps: save CPU registers, PC, stack pointer to PCB/TCB",
+      "Identifies that process switch changes CR3 register (page directory) which flushes TLB, causing cache misses"
+    ],
+    modelAnswerOutline: "Memory: A Process owns an isolated virtual address space (code, data, heap, file descriptors). Threads within the same process share heap, text, and data segments, but each thread has its own private Stack, Registers, and Program Counter (PC). Context Switch: For threads, the kernel saves registers and stack pointer. For processes, the kernel must also switch virtual memory page tables (updating CR3 register). This invalidates the CPU Translation Lookaside Buffer (TLB), triggering expensive subsequent memory page walks and CPU cache misses."
+  },
+  {
+    id: "os-q2",
+    type: "technical",
+    category: "os",
+    role: "Core CS / Systems Engineer",
+    difficulty: "medium",
+    question: "What are the four necessary Coffman conditions required for a Deadlock to occur in an operating system? Explain how you would prevent or break at least one of these conditions in production software.",
+    context: "Concurrency, resource allocation graphs, and deadlock prevention.",
+    spokenPrompt: "Could you list the four Coffman conditions necessary for deadlock? How do we break or prevent deadlock in multi-threaded code?",
+    sampleFollowUps: [
+      "How does strict lock ordering (hierarchical locking) prevent circular wait?",
+      "What is the difference between deadlock prevention and deadlock avoidance (Banker's Algorithm)?"
+    ],
+    evaluationCriteria: [
+      "Lists all 4: Mutual Exclusion, Hold and Wait, No Preemption, Circular Wait",
+      "Explains lock ordering to prevent Circular Wait (e.g. always acquire Mutex A before Mutex B)",
+      "Mentions try_lock timeouts to avoid indefinite Hold and Wait"
+    ],
+    modelAnswerOutline: "Coffman Conditions: 1. Mutual Exclusion (resource held in non-shareable mode). 2. Hold and Wait (process holds resource while requesting another). 3. No Preemption (resource cannot be forcibly taken away). 4. Circular Wait (chain of processes waiting on next). Prevention: Break Circular Wait by enforcing a strict global lock ordering (all threads acquire locks in identical alphabetical or memory address order). Break Hold and Wait by requiring threads to acquire all needed locks atomically upfront, or using timed locks (pthread_mutex_timedlock / try_lock)."
+  },
+  // 5. COMPUTER NETWORKING
+  {
+    id: "net-q1",
+    type: "technical",
+    category: "networking",
+    role: "Systems / Network / DevOps / Backend",
+    difficulty: "medium",
+    question: "Walk through the TCP 3-Way Handshake (SYN, SYN-ACK, ACK) and 4-Way Teardown (FIN, ACK, FIN, ACK). What is the purpose of the TIME_WAIT state, and what problems occur if too many sockets get stuck in TIME_WAIT?",
+    context: "Transport Layer protocol mechanics, sequence numbers, and socket lifecycle.",
+    spokenPrompt: "Let's discuss transport networking. Walk me through the TCP three-way handshake, and explain why the TIME_WAIT socket state is essential on the client.",
+    sampleFollowUps: [
+      "How long is 2MSL (Maximum Segment Lifetime) typically in modern operating systems?",
+      "How do SYN cookies protect against SYN Flood DDoS attacks?"
+    ],
+    evaluationCriteria: [
+      "Correctly outlines SYN (seq=x), SYN-ACK (seq=y, ack=x+1), ACK (seq=x+1, ack=y+1)",
+      "Explains TIME_WAIT (2MSL) allows delayed in-flight packets to expire so they don't corrupt a new connection",
+      "Explains TIME_WAIT ensures final ACK was received by peer (allows retransmitting ACK if FIN repeats)",
+      "Identifies ephemeral port exhaustion when high connection churning fills port range"
+    ],
+    modelAnswerOutline: "Handshake: 1. Client sends SYN (seq=x). 2. Server replies SYN-ACK (seq=y, ack=x+1). 3. Client returns ACK (ack=y+1). Connection is ESTABLISHED. Teardown: 1. Initiator sends FIN. 2. Responder sends ACK. 3. Responder sends FIN. 4. Initiator sends ACK and enters TIME_WAIT state for 2*MSL (typically 60s). Purpose of TIME_WAIT: 1. Ensure remote peer received final ACK (if ACK lost, server re-sends FIN). 2. Prevent old duplicate packets from a previous connection from being accepted by a new connection on the same IP:port tuple. Risk: Ephemeral port exhaustion in microservices making frequent short-lived HTTP connections."
+  },
+  {
+    id: "net-q2",
+    type: "technical",
+    category: "networking",
+    role: "Frontend / Backend / Fullstack",
+    difficulty: "medium",
+    question: "Compare HTTP/1.1, HTTP/2, and HTTP/3. Specifically explain Head-of-Line (HoL) blocking at the application layer in HTTP/1.1 vs at the transport layer in HTTP/2, and how HTTP/3 resolves this using QUIC over UDP.",
+    context: "Evolution of web protocols, binary framing, multiplexing, and UDP QUIC.",
+    spokenPrompt: "How do HTTP 1.1, HTTP 2, and HTTP 3 differ regarding Head of Line blocking? How does QUIC over UDP solve this completely?",
+    sampleFollowUps: [
+      "Why did HTTP/2 multiplexed streams still suffer from packet loss delays over TCP?",
+      "What is 0-RTT connection resumption in TLS 1.3 with QUIC?"
+    ],
+    evaluationCriteria: [
+      "Explains HTTP/1.1 sequential pipelining limitation (slow resource blocks following ones on same TCP socket)",
+      "Explains HTTP/2 binary framing multiplexes multiple streams over 1 TCP connection, but TCP packet loss stalls ALL streams",
+      "Explains HTTP/3 uses QUIC over UDP: individual streams are decoupled so packet loss on one stream does not block others"
+    ],
+    modelAnswerOutline: "HTTP/1.1: Text protocol. Suffers from Application-Layer HoL blocking: request 2 cannot finish until request 1 completes on that socket (browsers opened 6 parallel connections as a workaround). HTTP/2: Binary framing layer allows interleaving frames from multiple streams on a single TCP connection. However, it introduced Transport-Layer HoL blocking: if 1 TCP segment drops, TCP halts ALL streams until the dropped packet retransmits. HTTP/3: Replaces TCP with QUIC over UDP. Each stream is independent at the transport layer. A dropped UDP packet only pauses its specific stream, leaving other parallel requests unaffected."
+  },
+  // 6. NUMERICAL & QUANTITATIVE APTITUDE
+  {
+    id: "num-q1",
+    type: "aptitude",
+    category: "numerical",
+    role: "Campus Placement / Engineering / Tech",
+    difficulty: "easy",
+    question: "Numerical Aptitude: Pipe A can fill a water tank in 12 hours, while Pipe B can fill it in 18 hours. If both pipes are opened simultaneously, but Pipe A is closed after 4 hours, how many total hours will it take to fill the tank completely?",
+    context: "Work & Time rate arithmetic commonly featured in tech placement assessments.",
+    spokenPrompt: "Let's test your numerical problem solving. If Pipe A fills a tank in 12 hours and Pipe B in 18 hours, and Pipe A closes after 4 hours, what is the total time to fill the tank?",
+    sampleFollowUps: [
+      "What percentage of the tank was filled by Pipe A versus Pipe B?",
+      "If Pipe C was a drain pipe emptying the tank in 36 hours, how would that alter the rate equation?"
+    ],
+    evaluationCriteria: [
+      "Calculates combined filling rate: 1/12 + 1/18 = 5/36 per hour",
+      "Calculates work done in first 4 hours: 4 * (5/36) = 20/36 = 5/9",
+      "Calculates remaining work: 1 - 5/9 = 4/9",
+      "Calculates Pipe B remaining time: (4/9) / (1/18) = 8 hours",
+      "Calculates total time: 4 + 8 = 12 hours"
+    ],
+    modelAnswerOutline: "1. Rate of A = 1/12 per hr. Rate of B = 1/18 per hr. 2. Combined rate in 1 hr = (3 + 2)/36 = 5/36. 3. In 4 hours, work done = 4 * (5/36) = 20/36 = 5/9 of tank. 4. Remaining work = 1 - 5/9 = 4/9. 5. Pipe B alone finishes remaining 4/9: Time = (4/9) / (1/18) = (4/9) * 18 = 8 hours. 6. Total time = 4 hours (together) + 8 hours (B alone) = 12 hours total."
+  },
+  {
+    id: "num-q2",
+    type: "aptitude",
+    category: "numerical",
+    role: "General Software Engineer / Data",
+    difficulty: "medium",
+    question: "Quantitative Probability: A bag contains 5 red balls, 4 blue balls, and 3 green balls (12 balls total). If 3 balls are drawn at random without replacement, what is the exact probability that all three balls are of different colors?",
+    context: "Combinatorics and probability without replacement.",
+    spokenPrompt: "Here is a probability question. With 5 red, 4 blue, and 3 green balls, what is the exact probability of drawing three balls of three different colors without replacement?",
+    sampleFollowUps: [
+      "What is the probability that at least two of the three balls share the same color?",
+      "How would the calculation change if drawing with replacement?"
+    ],
+    evaluationCriteria: [
+      "Calculates total possible 3-ball combinations: 12C3 = (12 * 11 * 10) / (3 * 2 * 1) = 220",
+      "Calculates favorable outcomes (1 Red, 1 Blue, 1 Green): 5C1 * 4C1 * 3C1 = 5 * 4 * 3 = 60",
+      "Calculates exact probability: 60 / 220 = 3 / 11 (approx 27.27%)"
+    ],
+    modelAnswerOutline: "Total combinations: 12 choose 3 = 12! / (3! * 9!) = (12 * 11 * 10) / 6 = 220. Favorable outcomes (selecting 1 Red, 1 Blue, 1 Green): (5C1) * (4C1) * (3C1) = 5 * 4 * 3 = 60. Probability = Favorable / Total = 60 / 220 = 6 / 22 = 3 / 11 (approx 27.27%)."
+  },
+  // 7. HR & BEHAVIORAL QUESTIONS
   {
     id: "hr-q1",
     type: "hr",
-    question: "Tell me about a time when you had a disagreement with a team member or technical lead over a design decision. How did you handle it, and what was the outcome?",
+    category: "hr",
+    role: "All Roles",
+    difficulty: "medium",
+    question: "Tell me about a time when you had a disagreement with a team member or technical lead over an architectural or design decision. How did you handle it, and what was the outcome?",
     context: "Assessing emotional intelligence, conflict resolution, data-driven disagreement, and commit mindset.",
+    spokenPrompt: "Tell me about a time you disagreed with a colleague or technical lead on an engineering decision. How did you approach the disagreement, and what was the resolution?",
     sampleFollowUps: [
       "If you still believed your architectural approach was superior, how did you reconcile implementing their decision?",
       "What did this experience teach you about working in diverse engineering teams?"
@@ -808,8 +1044,12 @@ var MOCK_INTERVIEW_QUESTIONS = [
   {
     id: "hr-q2",
     type: "hr",
-    question: "Describe a situation where a project or release was severely behind schedule or facing unexpected blockers. What actions did you take to bring it back on track?",
+    category: "hr",
+    role: "All Roles",
+    difficulty: "medium",
+    question: "Describe a situation where a software project or feature release was severely behind schedule or facing unexpected blockers. What specific actions did you take to bring it back on track?",
     context: "Assessing ownership, prioritization, bias for action, and transparent communication under pressure.",
+    spokenPrompt: "Describe a situation where a critical software release was falling behind schedule. What steps did you personally take to realign priorities and hit the delivery goal?",
     sampleFollowUps: [
       "How did you prioritize which features to ship vs cut?",
       "How did you communicate the risk to stakeholders without causing panic?"
@@ -821,24 +1061,41 @@ var MOCK_INTERVIEW_QUESTIONS = [
       "Delivered a successful outcome"
     ],
     modelAnswerOutline: "Situation: Two weeks before our institution's online exam rollout, our primary database migration script began corrupting historical records during test runs. Task: I was responsible for the migration pipeline and had to ensure zero data loss while hitting our firm launch deadline. Action: I immediately alerted our lead engineer, paused non-essential sprint tasks, and decoupled the migration into idempotent, verifiable batches with automatic rollback checkpoints. I worked alongside our DBA to test the dry run on staging. Result: The migration executed in 18 minutes on release day with 100% integrity, zero downtime, and the platform launched on the scheduled date."
-  },
-  {
-    id: "hr-q3",
-    type: "hr",
-    question: "Why do you want to join our company specifically, and what makes you uniquely suited for this role compared to other candidates?",
-    context: "Assessing company research, intrinsic motivation, self-awareness, and cultural alignment.",
-    sampleFollowUps: [
-      "What are the biggest challenges you believe our engineering team is facing right now?",
-      "Where do you see yourself contributing within your first 90 days?"
-    ],
-    evaluationCriteria: [
-      "Shows genuine understanding of the company's products and challenges",
-      "Connects personal engineering passions to the role responsibilities",
-      "Demonstrates humility and eagerness to learn"
-    ],
-    modelAnswerOutline: "Express deep familiarity with the organization's mission and engineering accomplishments. Highlight specific projects or challenges that match your skill set (e.g., real-time systems, scale, web standards). Connect past accomplishments directly to the team's needs, and outline a humble, high-impact 30-60-90 day ramp-up plan."
   }
 ];
+function getStudentInterviewQuestions(studentEmail, role, roundType = "comprehensive") {
+  let seed = 0;
+  for (let i = 0; i < studentEmail.length; i++) {
+    seed = (seed << 5) - seed + studentEmail.charCodeAt(i);
+    seed |= 0;
+  }
+  seed = Math.abs(seed);
+  const getCategorized = (cat) => MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === cat);
+  if (roundType === "hr") {
+    return MOCK_INTERVIEW_QUESTIONS.filter((q) => q.type === "hr");
+  }
+  if (roundType === "technical") {
+    const codings = getCategorized("coding");
+    const dsas = getCategorized("dsa");
+    const sys = getCategorized("system_design");
+    const os = getCategorized("os");
+    const net = getCategorized("networking");
+    return [
+      codings[seed % codings.length],
+      dsas[(seed + 1) % dsas.length],
+      sys[(seed + 2) % sys.length],
+      os[(seed + 3) % os.length],
+      net[(seed + 4) % net.length]
+    ].filter(Boolean);
+  }
+  const codingQ = getCategorized("coding")[seed % getCategorized("coding").length];
+  const dsaQ = getCategorized("dsa")[(seed + 1) % getCategorized("dsa").length];
+  const sysQ = getCategorized("system_design")[(seed + 2) % getCategorized("system_design").length];
+  const osNetQ = seed % 2 === 0 ? getCategorized("os")[(seed + 3) % getCategorized("os").length] : getCategorized("networking")[(seed + 3) % getCategorized("networking").length];
+  const numQ = getCategorized("numerical")[(seed + 4) % getCategorized("numerical").length];
+  const hrQ = getCategorized("hr")[(seed + 5) % getCategorized("hr").length];
+  return [codingQ, dsaQ, sysQ, osNetQ, numQ, hrQ].filter(Boolean);
+}
 
 // server.ts
 var import_socket = require("socket.io");
@@ -1097,6 +1354,21 @@ async function initDb(retries = 5, delay = 2e3) {
           transcript JSON,
           feedback JSON,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS exam_autosaves (
+          id VARCHAR(255) PRIMARY KEY,
+          exam_id VARCHAR(255) NOT NULL,
+          candidate_email VARCHAR(255) NOT NULL,
+          candidate_name VARCHAR(255) NOT NULL,
+          answers JSON,
+          violations JSON,
+          ai_reports JSON,
+          integrity_score INT,
+          time_left_seconds INT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_attempt (exam_id, candidate_email)
         )
       `);
       try {
@@ -1371,6 +1643,12 @@ function simulateCodeExecution(language, code, input) {
   };
 }
 var JWT_SECRET = process.env.JWT_SECRET || "super_secret_iris_jwt_key_2026";
+app.get("/api/config", (_req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "",
+    nodeEnv: process.env.NODE_ENV || "production"
+  });
+});
 app.post("/api/auth/register", async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password) {
@@ -1834,6 +2112,13 @@ app.post("/api/submissions", async (req, res) => {
       );
     } catch (e) {
       console.error("MySQL POST submission failed", e);
+    }
+    try {
+      await dbPool.query(
+        "DELETE FROM exam_autosaves WHERE exam_id = ? AND candidate_email = ?",
+        [newSubmission.examId, newSubmission.candidateEmail]
+      );
+    } catch (cleanErr) {
     }
     res.status(201).json(newSubmission);
   } catch (err) {
@@ -2393,6 +2678,126 @@ app.post("/api/proctor/scan", async (req, res) => {
     });
   }
 });
+app.post("/api/exams/autosave", async (req, res) => {
+  try {
+    const {
+      examId,
+      candidateEmail,
+      candidateName,
+      answers,
+      violations,
+      aiReports,
+      integrityScore,
+      timeLeftSeconds
+    } = req.body;
+    if (!examId || !candidateEmail) {
+      res.status(400).json({ error: "Exam ID and candidate email are required" });
+      return;
+    }
+    const autosaveId = `as_${examId}_${candidateEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    await dbPool.query(
+      `INSERT INTO exam_autosaves 
+       (id, exam_id, candidate_email, candidate_name, answers, violations, ai_reports, integrity_score, time_left_seconds)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         answers = VALUES(answers),
+         violations = VALUES(violations),
+         ai_reports = VALUES(ai_reports),
+         integrity_score = VALUES(integrity_score),
+         time_left_seconds = VALUES(time_left_seconds),
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        autosaveId,
+        examId,
+        candidateEmail,
+        candidateName || "Student Candidate",
+        JSON.stringify(answers || []),
+        JSON.stringify(violations || []),
+        JSON.stringify(aiReports || []),
+        Number(integrityScore) || 100,
+        Number(timeLeftSeconds) || 0
+      ]
+    );
+    res.json({ success: true, savedAt: (/* @__PURE__ */ new Date()).toISOString() });
+  } catch (err) {
+    console.error("Autosave database error:", err);
+    res.status(500).json({ error: "Failed to persist autosave to database", details: err.message });
+  }
+});
+app.get("/api/exams/autosave/:examId/:email", async (req, res) => {
+  try {
+    const { examId, email } = req.params;
+    const [rows] = await dbPool.query(
+      "SELECT * FROM exam_autosaves WHERE exam_id = ? AND candidate_email = ? LIMIT 1",
+      [examId, email]
+    );
+    if (!rows || rows.length === 0) {
+      res.json({ exists: false, autosave: null });
+      return;
+    }
+    const row = rows[0];
+    res.json({
+      exists: true,
+      autosave: {
+        answers: typeof row.answers === "string" ? JSON.parse(row.answers) : row.answers,
+        violations: typeof row.violations === "string" ? JSON.parse(row.violations) : row.violations,
+        aiReports: typeof row.ai_reports === "string" ? JSON.parse(row.ai_reports) : row.ai_reports,
+        integrityScore: row.integrity_score,
+        timeLeftSeconds: row.time_left_seconds,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch exam autosave" });
+  }
+});
+app.delete("/api/exams/autosave/:examId/:email", async (req, res) => {
+  try {
+    const { examId, email } = req.params;
+    await dbPool.query("DELETE FROM exam_autosaves WHERE exam_id = ? AND candidate_email = ?", [
+      examId,
+      email
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to clear autosave" });
+  }
+});
+setInterval(async () => {
+  try {
+    const [staleAutosaves] = await dbPool.query(
+      `SELECT * FROM exam_autosaves WHERE time_left_seconds <= 5 AND updated_at < NOW() - INTERVAL 1 MINUTE LIMIT 10`
+    );
+    if (staleAutosaves && staleAutosaves.length > 0) {
+      for (const auto of staleAutosaves) {
+        const subId = `sub_auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const answers = typeof auto.answers === "string" ? JSON.parse(auto.answers) : auto.answers;
+        const violations = typeof auto.violations === "string" ? JSON.parse(auto.violations) : auto.violations;
+        const aiReports = typeof auto.ai_reports === "string" ? JSON.parse(auto.ai_reports) : auto.ai_reports;
+        const totalQ = Array.isArray(answers) ? answers.length : 0;
+        const score = totalQ > 0 ? Math.round(answers.filter((a) => a.isCorrect).length / totalQ * 100) : 0;
+        await dbPool.query(
+          `INSERT INTO submissions (id, exam_id, candidate_name, candidate_email, score, integrity_score, answers, violations, ai_reports, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            subId,
+            auto.exam_id,
+            auto.candidate_name,
+            auto.candidate_email,
+            score,
+            auto.integrity_score || 100,
+            JSON.stringify(answers || []),
+            JSON.stringify(violations || []),
+            JSON.stringify(aiReports || [])
+          ]
+        );
+        await dbPool.query("DELETE FROM exam_autosaves WHERE id = ?", [auto.id]);
+        console.log(`[Auto-Submit] Successfully auto-submitted expired exam for ${auto.candidate_email} (${auto.exam_id})`);
+      }
+    }
+  } catch (sweepErr) {
+  }
+}, 3e4);
 app.get("/api/interview/tracks", (_req, res) => {
   res.json({
     topics: INTERVIEW_TOPICS,
@@ -2401,9 +2806,17 @@ app.get("/api/interview/tracks", (_req, res) => {
     mockQuestions: MOCK_INTERVIEW_QUESTIONS
   });
 });
+app.get("/api/interview/questions", (req, res) => {
+  const { email, role, round } = req.query;
+  const studentEmail = email || "student@university.edu";
+  const userRole = role || "Fullstack Engineer";
+  const roundType = round || "comprehensive";
+  const questions = getStudentInterviewQuestions(studentEmail, userRole, roundType);
+  res.json(questions);
+});
 app.post("/api/interview/evaluate", async (req, res) => {
   try {
-    const { questionId, question, answer, roundType, role, company } = req.body;
+    const { questionId, question, answer, roundType, role, company, category } = req.body;
     if (!answer || answer.trim().length === 0) {
       res.status(400).json({ error: "Candidate response cannot be empty." });
       return;
@@ -2411,21 +2824,22 @@ app.post("/api/interview/evaluate", async (req, res) => {
     const trimmedAnswer = answer.trim();
     const wordCount = trimmedAnswer.split(/\s+/).length;
     const matchedQ = MOCK_INTERVIEW_QUESTIONS.find((q) => q.id === questionId);
+    const qCategory = category || matchedQ?.category || "technical";
     let score = 50;
     const strengths = [];
     const improvements = [];
-    if (wordCount >= 60) {
+    if (wordCount >= 45) {
       score += 15;
       strengths.push("Provided comprehensive depth and detailed elaboration.");
-    } else if (wordCount >= 30) {
+    } else if (wordCount >= 20) {
       score += 8;
-      strengths.push("Direct and concise response structure.");
+      strengths.push("Clear, concise, and structured delivery.");
     } else {
-      score -= 15;
-      improvements.push("Response was too brief. Expand with concrete examples and rationale.");
+      score -= 10;
+      improvements.push("Response was brief. Expand with concrete rationale, examples, or step derivations.");
     }
-    if (roundType === "technical") {
-      const techKeywords = [
+    if (qCategory === "coding" || qCategory === "dsa") {
+      const algoKeywords = [
         "complexity",
         "o(n",
         "o(1",
@@ -2436,90 +2850,124 @@ app.post("/api/interview/evaluate", async (req, res) => {
         "pointer",
         "tree",
         "graph",
+        "stack",
+        "queue",
+        "binary search",
+        "recursion",
+        "memoization",
+        "dynamic programming",
+        "in-place",
+        "edge case",
+        "null",
+        "empty"
+      ];
+      const found = algoKeywords.filter((k) => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
+        strengths.push(`Strong algorithmic analysis: highlighted concepts like [${found.slice(0, 3).join(", ")}].`);
+      } else if (found.length >= 1) {
+        score += 12;
+        strengths.push(`Addressed core algorithmic concepts: ${found[0]}.`);
+      } else {
+        improvements.push("Explicitly state Big-O Time & Space complexity and consider boundary edge cases.");
+      }
+    } else if (qCategory === "system_design") {
+      const sysKeywords = [
         "cache",
         "redis",
-        "database",
-        "index",
-        "concurrency",
-        "microservice",
-        "asynchronous",
-        "latency",
-        "throughput",
-        "scalable",
         "sharding",
-        "edge case",
-        "boundary"
+        "replication",
+        "load balancer",
+        "gateway",
+        "throughput",
+        "latency",
+        "cap theorem",
+        "message queue",
+        "kafka",
+        "horizontal",
+        "failover",
+        "consistency",
+        "token bucket",
+        "rate limit"
       ];
-      const foundKeywords = techKeywords.filter(
-        (k) => trimmedAnswer.toLowerCase().includes(k)
-      );
-      if (foundKeywords.length >= 3) {
-        score += 20;
-        strengths.push(`Strong technical vocabulary: demonstrated mastery of [${foundKeywords.slice(0, 4).join(", ")}].`);
-      } else if (foundKeywords.length >= 1) {
-        score += 10;
-        strengths.push(`Referenced core technical concepts like [${foundKeywords[0]}].`);
+      const found = sysKeywords.filter((k) => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
+        strengths.push(`High-level architectural acumen: incorporated [${found.slice(0, 3).join(", ")}].`);
       } else {
-        improvements.push("Mention time/space complexity tradeoffs (Big-O notation) and edge-case handling.");
+        improvements.push("Address bottleneck resolution, caching layers, and database partitioning strategies.");
       }
-      if (/edge case|null|empty|overflow|duplicate/i.test(trimmedAnswer)) {
-        score += 10;
-        strengths.push("Proactively considered edge cases and error bounds.");
+    } else if (qCategory === "os" || qCategory === "networking") {
+      const osNetKeywords = [
+        "thread",
+        "process",
+        "context switch",
+        "deadlock",
+        "mutex",
+        "semaphore",
+        "virtual memory",
+        "paging",
+        "tlb",
+        "tcp",
+        "udp",
+        "handshake",
+        "socket",
+        "quic",
+        "http",
+        "time_wait",
+        "syn",
+        "ack",
+        "packet"
+      ];
+      const found = osNetKeywords.filter((k) => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
+        strengths.push(`Accurate systems knowledge: properly referenced [${found.slice(0, 3).join(", ")}].`);
       } else {
-        improvements.push("Discuss boundary validation, such as empty inputs or high concurrent loads.");
+        improvements.push("Incorporate precise kernel or protocol lifecycle mechanics.");
+      }
+    } else if (qCategory === "numerical") {
+      const numKeywords = ["rate", "probability", "total", "ratio", "fraction", "formula", "hours", "percent", "equals", "="];
+      const found = numKeywords.filter((k) => trimmedAnswer.toLowerCase().includes(k));
+      if (/\d+/.test(trimmedAnswer)) {
+        score += 15;
+        strengths.push("Provided concrete quantitative derivation and numerical output.");
+      }
+      if (found.length >= 2) {
+        score += 15;
+        strengths.push("Showed clear step-by-step mathematical reasoning.");
+      } else {
+        improvements.push("Write out the intermediate arithmetic formulas and verify unit calculations.");
       }
     } else {
-      const starKeywords = [
-        "situation",
-        "task",
-        "action",
-        "result",
-        "team",
-        "learned",
-        "outcome",
-        "impact",
-        "handled",
-        "metric",
-        "improved",
-        "deadline"
-      ];
-      const foundStar = starKeywords.filter(
-        (k) => trimmedAnswer.toLowerCase().includes(k)
-      );
-      if (foundStar.length >= 3) {
-        score += 20;
+      const starKeywords = ["situation", "task", "action", "result", "team", "learned", "impact", "delivered", "handled"];
+      const found = starKeywords.filter((k) => trimmedAnswer.toLowerCase().includes(k));
+      if (found.length >= 3) {
+        score += 25;
         strengths.push("Structured narrative aligns effectively with the STAR (Situation, Task, Action, Result) method.");
       } else {
         improvements.push("Structure your story using the STAR framework: Situation, Task, Action, and measurable Result.");
       }
-      if (/learned|impact|metric|percent|reduced|increased/i.test(trimmedAnswer)) {
-        score += 15;
-        strengths.push("Articulated measurable business impact and reflective learnings.");
-      } else {
-        improvements.push("Quantify the positive result (e.g. reduced latency by 30%, shipped 2 days early).");
-      }
     }
-    const finalScore = Math.min(98, Math.max(38, score));
-    let followUpQuestion = "Can you walk me through how you would test this solution against production traffic spikes?";
+    const finalScore = Math.min(98, Math.max(40, score));
+    let followUpQuestion = "Can you walk me through how you would test and verify this in a live production environment?";
     if (matchedQ?.sampleFollowUps && matchedQ.sampleFollowUps.length > 0) {
       const idx = Math.floor(Math.random() * matchedQ.sampleFollowUps.length);
       followUpQuestion = matchedQ.sampleFollowUps[idx];
-    } else if (roundType === "hr") {
-      followUpQuestion = "Looking back at that scenario, what would you have done differently knowing what you know now?";
     }
     let feedback = "";
     if (finalScore >= 85) {
-      feedback = `Excellent answer! You demonstrated great ${roundType === "technical" ? "algorithmic problem-solving and architectural clarity" : "interpersonal communication, ownership, and STAR-aligned storytelling"}.`;
+      feedback = "Outstanding response! You demonstrated strong technical depth, logical clarity, and structured delivery.";
     } else if (finalScore >= 70) {
-      feedback = `Good answer with solid fundamentals. To elevate this to a top-tier hire rating, incorporate the suggestions below.`;
+      feedback = "Good response with solid fundamentals. Incorporate the targeted suggestions below to elevate your interview rating.";
     } else {
-      feedback = `Fair attempt, but your response needs greater specificity, quantitative evidence, and structured delivery.`;
+      feedback = "Fair attempt, but your answer needs greater technical precision, concrete examples, and structured reasoning.";
     }
     res.json({
       score: finalScore,
       feedback,
-      strengths: strengths.length > 0 ? strengths : ["Demonstrated positive willingness to tackle the prompt."],
-      improvements: improvements.length > 0 ? improvements : ["Continue practicing timed verbal delivery."],
+      strengths: strengths.length > 0 ? strengths : ["Demonstrated positive willingness to tackle the challenge."],
+      improvements: improvements.length > 0 ? improvements : ["Continue refining timed verbal and code delivery."],
       followUpQuestion
     });
   } catch (err) {

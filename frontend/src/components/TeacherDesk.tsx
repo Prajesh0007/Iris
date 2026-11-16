@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Plus, CheckCircle, FileText, Calendar, Bell, ClipboardCheck, 
   BookOpen, Clock, AlertOctagon, ShieldCheck, Award, 
-  Trash2, PlusCircle, Save, X, Lock
+  Trash2, PlusCircle, Save, X, Lock, Play, Terminal, Code, AlertCircle
 } from "lucide-react";
 import { Exam, Question, QuestionType, TestCase, Submission } from "../types";
 
@@ -90,6 +90,85 @@ export default function TeacherDesk({
   const [correctMcqIndex, setCorrectMcqIndex] = useState(0);
   const [codeBoilerplate, setCodeBoilerplate] = useState("");
   const [testCases, setTestCases] = useState<TestCase[]>([{ input: "", expectedOutput: "", isHidden: false }]);
+
+  // Real-Time Backend Compiler Workbench State for Coding Questions
+  const [compilerLanguage, setCompilerLanguage] = useState<"javascript" | "python">("javascript");
+  const [solutionCodeToTest, setSolutionCodeToTest] = useState<string>("");
+  const [isCompiling, setIsCompiling] = useState<boolean>(false);
+  const [compileResults, setCompileResults] = useState<
+    { index: number; passed: boolean; actual: string; expected: string; timeMs: number; error?: string }[]
+  >([]);
+  const [compilerOutputLogs, setCompilerOutputLogs] = useState<string>("");
+
+  const runCompilerValidation = async () => {
+    const codeToExecute = solutionCodeToTest.trim() || codeBoilerplate.trim();
+    if (!codeToExecute) {
+      alert("Please provide code in the editor to run and validate.");
+      return;
+    }
+    const validTestCases = testCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
+    if (validTestCases.length === 0) {
+      alert("Please add at least one test case with input and expected output.");
+      return;
+    }
+
+    setIsCompiling(true);
+    setCompileResults([]);
+    setCompilerOutputLogs(`[Compiler] Dispatching ${validTestCases.length} test cases to isolated backend sandbox...\n`);
+
+    try {
+      const results: typeof compileResults = [];
+      let logs = "";
+
+      for (let i = 0; i < validTestCases.length; i++) {
+        const tc = validTestCases[i];
+        const start = performance.now();
+        const res = await fetch("/api/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: codeToExecute,
+            input: tc.input,
+            language: compilerLanguage,
+          }),
+        });
+
+        const data = await res.json();
+        const duration = Math.round(performance.now() - start);
+
+        let actual = "";
+        let passed = false;
+        let errorMsg = undefined;
+
+        if (data.error) {
+          actual = "Error: " + data.error;
+          errorMsg = data.error;
+          logs += `✖ [Test Case ${i + 1}] FAILED: ${data.error}\n`;
+        } else {
+          actual = String(data.output ?? data.result ?? "").trim();
+          const cleanExpected = tc.expectedOutput.trim();
+          passed = actual === cleanExpected || JSON.stringify(actual) === JSON.stringify(cleanExpected);
+          logs += `${passed ? "✔" : "✖"} [Test Case ${i + 1}] ${passed ? "PASSED" : "FAILED"} (${duration}ms)\n  Input: ${tc.input || "(none)"}\n  Expected: ${cleanExpected}\n  Actual:   ${actual}\n\n`;
+        }
+
+        results.push({
+          index: i,
+          passed,
+          actual,
+          expected: tc.expectedOutput,
+          timeMs: duration,
+          error: errorMsg,
+        });
+      }
+
+      setCompileResults(results);
+      setCompilerOutputLogs(logs);
+    } catch (err: any) {
+      setCompilerOutputLogs((prev) => prev + "\nBackend execution failure: " + err.message);
+    } finally {
+      setIsCompiling(false);
+    }
+  };
 
   // Data fetching state
   const [notices, setNotices] = useState<any[]>([]);
@@ -621,38 +700,195 @@ export default function TeacherDesk({
                 </div>
               )}
 
-              {/* Dynamic Coding Test Cases */}
+              {/* Dynamic Coding Test Cases & Real-Time Compiler */}
               {draftQType === "coding" && (
-                <div className="flex flex-col gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-sm text-slate-300">
-                  <div className="flex flex-col gap-1.5">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase">Javascript Boilerplate</label>
-                     <textarea value={codeBoilerplate} onChange={(e) => setCodeBoilerplate(e.target.value)} placeholder="function solution(args) {\n  // your code here\n}" className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-mono h-32 resize-none focus:outline-none focus:border-indigo-500 text-emerald-400" />
+                <div className="flex flex-col gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-md text-slate-300">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Code className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-bold text-slate-200">Coding Question Workbench & Backend Compiler</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Language:</span>
+                      <select
+                        value={compilerLanguage}
+                        onChange={(e) => setCompilerLanguage(e.target.value as any)}
+                        className="bg-slate-950 border border-slate-700 text-xs text-slate-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-indigo-500 font-mono"
+                      >
+                        <option value="javascript">JavaScript (Node.js vm)</option>
+                        <option value="python">Python 3 (Sandbox)</option>
+                      </select>
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center justify-between border-t border-slate-700 pt-4 mt-2">
-                     <label className="text-xs font-bold text-slate-300 uppercase">Test Cases Validation</label>
-                     <button onClick={() => setTestCases([...testCases, { input: "", expectedOutput: "", isHidden: false }])} className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1 hover:text-indigo-300 transition-colors"><PlusCircle className="w-3 h-3"/> Add Test Case</button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Candidate Starter Boilerplate
+                        </label>
+                        <span className="text-[9px] text-slate-500">Provided to students</span>
+                      </div>
+                      <textarea
+                        value={codeBoilerplate}
+                        onChange={(e) => setCodeBoilerplate(e.target.value)}
+                        placeholder={`function solution(args) {\n  // Write your code here\n  return args;\n}`}
+                        className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono h-36 resize-none focus:outline-none focus:border-indigo-500 text-emerald-400"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Teacher Reference Solution (Optional to Test)
+                        </label>
+                        <span className="text-[9px] text-slate-500">Leave blank to test boilerplate</span>
+                      </div>
+                      <textarea
+                        value={solutionCodeToTest}
+                        onChange={(e) => setSolutionCodeToTest(e.target.value)}
+                        placeholder={`// Enter reference solution to verify test cases\nfunction solution(args) {\n  return args;\n}`}
+                        className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono h-36 resize-none focus:outline-none focus:border-indigo-500 text-cyan-400"
+                      />
+                    </div>
                   </div>
-                  
-                  <div className="flex flex-col gap-3">
-                     {testCases.map((tc, idx) => (
-                        <div key={idx} className="grid grid-cols-12 gap-3 items-center bg-slate-800 p-3 rounded-xl border border-slate-600">
-                           <div className="col-span-5 flex flex-col gap-1">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Input Params</label>
-                              <input type="text" value={tc.input} onChange={e => { const n = [...testCases]; n[idx].input = e.target.value; setTestCases(n); }} placeholder="e.g. 2, 4" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none" />
-                           </div>
-                           <div className="col-span-5 flex flex-col gap-1">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Expected Output</label>
-                              <input type="text" value={tc.expectedOutput} onChange={e => { const n = [...testCases]; n[idx].expectedOutput = e.target.value; setTestCases(n); }} placeholder="e.g. 6" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-mono text-emerald-400 focus:border-indigo-500 focus:outline-none" />
-                           </div>
-                           <div className="col-span-2 flex items-center justify-end h-full pt-4">
-                              <button onClick={() => setTestCases(testCases.filter((_, i) => i !== idx))} className="p-2 bg-rose-500/10 text-rose-400 rounded-lg hover:bg-rose-500/20 hover:text-rose-300 transition-colors">
-                                 <Trash2 className="w-4 h-4" />
-                              </button>
-                           </div>
+
+                  {/* Test Cases Definition & Management */}
+                  <div className="flex items-center justify-between border-t border-slate-800 pt-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-slate-300 uppercase">Test Cases Specification</label>
+                      <span className="text-[10px] text-slate-400">({testCases.length} Defined)</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={runCompilerValidation}
+                        disabled={isCompiling}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3.5 rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        {isCompiling ? "Compiling on Server..." : "Run & Validate Test Cases"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTestCases([...testCases, { input: "", expectedOutput: "", isHidden: false }])}
+                        className="text-xs font-bold uppercase tracking-wider text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors px-2"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" /> Add Test Case
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5">
+                    {testCases.map((tc, idx) => {
+                      const res = compileResults.find((r) => r.index === idx);
+                      return (
+                        <div
+                          key={idx}
+                          className={`grid grid-cols-12 gap-3 items-center p-3 rounded-xl border transition-all ${
+                            res
+                              ? res.passed
+                                ? "bg-emerald-950/40 border-emerald-800"
+                                : "bg-rose-950/40 border-rose-800"
+                              : "bg-slate-800 border-slate-700"
+                          }`}
+                        >
+                          <div className="col-span-4 flex flex-col gap-1">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                              Input Arguments
+                            </label>
+                            <input
+                              type="text"
+                              value={tc.input}
+                              onChange={(e) => {
+                                const n = [...testCases];
+                                n[idx].input = e.target.value;
+                                setTestCases(n);
+                              }}
+                              placeholder='e.g. [2, 7, 11, 15], 9'
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="col-span-4 flex flex-col gap-1">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                              Expected Output
+                            </label>
+                            <input
+                              type="text"
+                              value={tc.expectedOutput}
+                              onChange={(e) => {
+                                const n = [...testCases];
+                                n[idx].expectedOutput = e.target.value;
+                                setTestCases(n);
+                              }}
+                              placeholder='e.g. [0, 1]'
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-mono text-emerald-400 focus:border-indigo-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="col-span-3 flex items-center gap-2 pt-3">
+                            {res ? (
+                              <span
+                                className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md border flex items-center gap-1 ${
+                                  res.passed
+                                    ? "bg-emerald-900/60 text-emerald-300 border-emerald-700"
+                                    : "bg-rose-900/60 text-rose-300 border-rose-700"
+                                }`}
+                              >
+                                {res.passed ? "✔ PASSED" : "✖ FAILED"} ({res.timeMs}ms)
+                              </span>
+                            ) : (
+                              <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={tc.isHidden || false}
+                                  onChange={(e) => {
+                                    const n = [...testCases];
+                                    n[idx].isHidden = e.target.checked;
+                                    setTestCases(n);
+                                  }}
+                                  className="rounded text-indigo-500"
+                                />
+                                Hidden Case
+                              </label>
+                            )}
+                          </div>
+
+                          <div className="col-span-1 flex items-center justify-end pt-3">
+                            <button
+                              type="button"
+                              onClick={() => setTestCases(testCases.filter((_, i) => i !== idx))}
+                              className="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg hover:bg-rose-500/20 hover:text-rose-300 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                     ))}
+                      );
+                    })}
                   </div>
+
+                  {/* Live Backend Compiler Console Output */}
+                  {compilerOutputLogs && (
+                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold border-b border-slate-900 pb-1">
+                        <span className="flex items-center gap-1.5 text-slate-300">
+                          <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Backend Compiler Sandbox Logs
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCompilerOutputLogs("")}
+                          className="text-slate-500 hover:text-slate-300 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <pre className="text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
+                        {compilerOutputLogs}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
 

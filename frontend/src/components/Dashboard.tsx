@@ -176,7 +176,7 @@ export default function Dashboard({
   useEffect(() => {
     if (userRole === "student" && activeTab === "desk") {
       setActiveTab("take");
-    } else if (userRole === "teacher" && activeTab === "take") {
+    } else if (userRole === "teacher" && (activeTab === "take" || activeTab === "interview")) {
       setActiveTab("desk");
     }
   }, [userRole, activeTab]);
@@ -349,6 +349,22 @@ export default function Dashboard({
                 <div className="absolute bottom-0 inset-x-4 h-0.5 bg-indigo-600 rounded-full" />
               )}
             </button>
+            <button
+              onClick={() => {
+                setActiveTab("interview");
+                setSelectedExamForTake(null);
+              }}
+              className={`pb-3.5 px-4 text-sm font-semibold transition-all relative cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "interview"
+                  ? "text-indigo-600"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Sparkles className="h-4 w-4 text-violet-500" /> AI Mock Interview & Prep
+              {activeTab === "interview" && (
+                <div className="absolute bottom-0 inset-x-4 h-0.5 bg-indigo-600 rounded-full" />
+              )}
+            </button>
           </>
         )}
 
@@ -429,28 +445,9 @@ export default function Dashboard({
             <div className="absolute bottom-0 inset-x-4 h-0.5 bg-indigo-600 rounded-full" />
           )}
         </button>
-
-        <button
-          onClick={() => {
-            setActiveTab("interview");
-            setSelectedExamForTake(null);
-          }}
-          className={`pb-3.5 px-4 text-sm font-semibold transition-all relative cursor-pointer ${
-            activeTab === "interview"
-              ? "text-indigo-600"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="h-4 w-4 text-violet-500" /> Interview Prep & AI Mocks
-          </div>
-          {activeTab === "interview" && (
-            <div className="absolute bottom-0 inset-x-4 h-0.5 bg-indigo-600 rounded-full" />
-          )}
-        </button>
       </div>
 
-      {activeTab === "interview" && (
+      {userRole === "student" && activeTab === "interview" && (
         <InterviewPrep
           user={user}
           userRole={userRole}

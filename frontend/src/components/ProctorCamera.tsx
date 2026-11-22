@@ -279,8 +279,7 @@ export default function ProctorCamera({
               Simulating Webcam Feed
             </span>
             <span className="text-[10px] text-slate-500 max-w-[220px] leading-tight mt-1">
-              Real webcam bypassed. Simulated AI validation analyzing gaze
-              vectors & frame integrity.
+              Camera simulated feed active. AI vision engine analyzing gaze vectors and frame integrity.
             </span>
           </div>
         )}

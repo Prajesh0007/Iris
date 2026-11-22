@@ -212,11 +212,8 @@ export default function App() {
               <ShieldCheck className="h-5 w-5 text-white" />
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-sm font-black text-slate-900 tracking-tight leading-tight">
+              <span className="text-base font-black text-slate-900 tracking-tight leading-tight">
                 Iris
-              </span>
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-0.5">
-                Integrity Monitor
               </span>
             </div>
           </div>
@@ -265,11 +262,6 @@ export default function App() {
             </button>
 
             <NotificationsPopover userRole={userRole} studentContext={studentContext} />
-
-            <div className="hidden sm:flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-slate-400 bg-white/50 border border-slate-200/40 px-3 py-1.5 rounded-full backdrop-blur-xs">
-              <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              Active System Node
-            </div>
 
             {/* User Session & Logout */}
             <div className="flex items-center gap-2">

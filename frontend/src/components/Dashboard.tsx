@@ -290,19 +290,13 @@ export default function Dashboard({
       {/* Banner top hero card */}
       <div className="relative overflow-hidden glass p-6 sm:p-8 rounded-3xl border border-white/70 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-[0_12px_44px_-10px_rgba(0,0,0,0.03)] selection:bg-indigo-100">
         <div className="flex-1 text-left relative z-10 flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <span className="glass-pill text-[10px] px-2.5 py-1 text-indigo-700 font-bold uppercase tracking-wider flex items-center gap-1">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 fill-emerald-100" />{" "}
-              Proctor Shield Verification Core v2.4
-            </span>
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans leading-tight mt-1">
-            Iris Integrity Portal
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 font-sans leading-tight">
+            Iris Academic Assessment Suite
           </h1>
           <p className="text-sm text-slate-600 font-medium max-w-[580px] leading-relaxed">
-            Conduct coding exams and quizzes with robust Safe-Exam Browser (SEB)
-            lockouts, instant JS stack compilation, and live Web Camera face
-            analyzer proctoring models.
+            {userRole === "teacher"
+              ? "Author proctored assessments, manage classes and review detailed candidate integrity telemetry."
+              : "Access your scheduled tests, practice coding environments, and review your performance analytics."}
           </p>
         </div>
 

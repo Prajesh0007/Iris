@@ -80,6 +80,7 @@ export default function TeacherDesk({
   const [examEntryPassword, setExamEntryPassword] = useState("password123");
   const [examAdminExitPassword, setExamAdminExitPassword] = useState("admin");
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
 
   // Current Question Drafting State
   const [draftQType, setDraftQType] = useState<QuestionType>("mcq");
@@ -198,37 +199,89 @@ export default function TeacherDesk({
   }, []);
 
   // Exam Composer Actions
-  const handleAddQuestion = () => {
+  const handleSelectPaletteQuestion = (idx: number) => {
+    setEditingQuestionIndex(idx);
+    const q = questions[idx];
+    if (q) {
+      setDraftQType(q.type);
+      setDraftQTitle(q.title);
+      setDraftQPoints(q.points || 10);
+      setDraftQText(q.questionText || "");
+      if (q.type === "mcq" && q.options) {
+        setMcqOptions([...q.options]);
+        setCorrectMcqIndex(q.correctOptionIndex ?? 0);
+      }
+      if (q.type === "coding") {
+        setCodeBoilerplate(q.codeBoilerplate || "");
+        setTestCases(
+          q.testCases && q.testCases.length > 0
+            ? [...q.testCases]
+            : [{ input: "", expectedOutput: "", isHidden: false }]
+        );
+      }
+    }
+  };
+
+  const handleAddNewQuestionToPalette = () => {
+    setEditingQuestionIndex(null);
+    setDraftQTitle("");
+    setDraftQText("");
+    setDraftQPoints(10);
+    setDraftQType("mcq");
+    setMcqOptions(["", "", "", ""]);
+    setCorrectMcqIndex(0);
+    setCodeBoilerplate("");
+    setTestCases([{ input: "", expectedOutput: "", isHidden: false }]);
+  };
+
+  const handleSaveAndNextQuestion = () => {
     if (!draftQTitle.trim()) {
-      alert("Please provide a question title.");
+      alert("Please provide a question title before proceeding.");
       return;
     }
-    const nq: Question = {
-      id: "q-" + Date.now(),
+    const q: Question = {
+      id: editingQuestionIndex !== null ? questions[editingQuestionIndex].id : "q-" + Date.now(),
       type: draftQType,
       title: draftQTitle,
       points: draftQPoints,
       questionText: draftQText,
     };
-
     if (draftQType === "mcq") {
-      nq.options = [...mcqOptions];
-      nq.correctOptionIndex = correctMcqIndex;
+      q.options = [...mcqOptions];
+      q.correctOptionIndex = correctMcqIndex;
     } else if (draftQType === "coding") {
-      nq.language = "javascript";
-      nq.codeBoilerplate = codeBoilerplate;
-      nq.testCases = testCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
+      q.language = compilerLanguage;
+      q.codeBoilerplate = codeBoilerplate;
+      q.testCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
     }
 
-    setQuestions([...questions, nq]);
-    
-    // Reset draft fields
-    setDraftQTitle("");
-    setDraftQText("");
-    setCodeBoilerplate("");
-    setMcqOptions(["", "", "", ""]);
-    setCorrectMcqIndex(0);
-    setTestCases([{ input: "", expectedOutput: "", isHidden: false }]);
+    let updatedQuestions = [...questions];
+    if (editingQuestionIndex !== null) {
+      updatedQuestions[editingQuestionIndex] = q;
+    } else {
+      updatedQuestions.push(q);
+    }
+    setQuestions(updatedQuestions);
+
+    if (editingQuestionIndex !== null && editingQuestionIndex < updatedQuestions.length - 1) {
+      handleSelectPaletteQuestion(editingQuestionIndex + 1);
+    } else {
+      handleAddNewQuestionToPalette();
+    }
+  };
+
+  const handleDeleteQuestion = (idx: number) => {
+    const updated = questions.filter((_, i) => i !== idx);
+    setQuestions(updated);
+    if (editingQuestionIndex === idx) {
+      handleAddNewQuestionToPalette();
+    } else if (editingQuestionIndex !== null && editingQuestionIndex > idx) {
+      setEditingQuestionIndex(editingQuestionIndex - 1);
+    }
+  };
+
+  const handleAddQuestion = () => {
+    handleSaveAndNextQuestion();
   };
 
   const handleGenerateExam = async () => {
@@ -494,219 +547,269 @@ export default function TeacherDesk({
         })}
       </div>
 
-      {/* 1. DRAFT EXAM COMPOSER */}
+      {/* 1. DRAFT EXAM & QUESTION CREATOR IN PROFESSIONAL TEST SUITE DESIGN */}
       {activeWidget === "draft" && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 text-left">
-          {/* Metadata Configuration Matrix */}
-          <div className="xl:col-span-1 glass p-6 rounded-3xl border border-white/60 flex flex-col gap-5 h-max shadow-sm">
-            <h3 className="font-bold text-slate-800 text-sm border-b border-slate-150 pb-3 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-indigo-500" /> Configuration Matrix
-            </h3>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Target Departments</label>
-              <MultiSelect 
-                options={[
-                  {id: "Computer Science", label: "Computer Science"},
-                  {id: "Mathematics", label: "Mathematics"},
-                  {id: "Physics", label: "Physics"}
-                ]} 
-                selected={getDepts("draft")} 
-                onChange={(val) => setWidgetDepts("draft", val)} 
-                placeholder="Select Departments" 
-              />
-            </div>
-            
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Target Years</label>
-              <MultiSelect 
-                options={[
-                  {id: "First Year", label: "First Year"},
-                  {id: "Second Year", label: "Second Year"},
-                  {id: "Third Year", label: "Third Year"},
-                  {id: "Fourth Year", label: "Fourth Year"}
-                ]} 
-                selected={getYears("draft")} 
-                onChange={(val) => setWidgetYears("draft", val)} 
-                placeholder="Select Years" 
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Target Classes</label>
-              <MultiSelect 
-                options={classes.filter(c => getDepts("draft").includes(c.department) && getYears("draft").includes(c.year)).map(c => ({id: c.id, label: c.name}))} 
-                selected={getClasses("draft")} 
-                onChange={(val) => setWidgetClasses("draft", val)} 
-                placeholder="Select Classes" 
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Exam Title</label>
-              <input type="text" value={examTitle} onChange={(e) => setExamTitle(e.target.value)} placeholder="Algorithms & Logic structures exam" className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all font-medium" />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Description summary</label>
-              <textarea value={examDescription} onChange={(e) => setExamDescription(e.target.value)} placeholder="Provides key structural parameters evaluating logic algorithms." className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all h-24 resize-none font-medium" />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Subject Identifier</label>
-              <input type="text" value={examSubject} onChange={(e) => setExamSubject(e.target.value)} placeholder="CSC-101" className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1"><Calendar className="w-3 h-3 text-indigo-400" /> Start Date</label>
-                <input type="date" value={examStartDate} onChange={(e) => setExamStartDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1"><Clock className="w-3 h-3 text-indigo-400" /> Start Time</label>
-                <input type="time" value={examStartTimeOfDay} onChange={(e) => setExamStartTimeOfDay(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1"><Clock className="w-3 h-3 text-slate-400" /> Time (Min)</label>
-                <input type="number" value={examDuration} onChange={(e) => setExamDuration(Number(e.target.value))} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1"><AlertOctagon className="w-3 h-3 text-rose-400" /> Integrity Req.</label>
-                <input type="number" value={examIntegrityThreshold} onChange={(e) => setExamIntegrityThreshold(Number(e.target.value))} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500" />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 pt-3 border-t border-slate-100">
-              <label className="relative flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={examRequireCamera} onChange={(e) => setExamRequireCamera(e.target.checked)} className="sr-only peer" />
-                <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-emerald-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all shadow-inner"></div>
-                <span className="text-sm font-bold text-slate-700 transition-colors">Require AI Camera Proctor</span>
-              </label>
-
-              <label className="relative flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={examLockdownBrowsing} onChange={(e) => setExamLockdownBrowsing(e.target.checked)} className="sr-only peer" />
-                <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-rose-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all shadow-inner"></div>
-                <span className="text-sm font-bold text-slate-700 transition-colors">Strict App Lockdown</span>
-              </label>
-            </div>
-
-            <div className="flex flex-col gap-3 pt-3 border-t border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-indigo-500" /> Exam Security Passwords
+        <div className="flex flex-col gap-5 text-left animate-[fadeIn_0.3s_ease-out]">
+          {/* Top Header Bar matching Test Series breadcrumb style */}
+          <div className="bg-white border border-slate-200 rounded-2xl px-6 py-3.5 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="font-extrabold text-sm sm:text-base text-slate-800 tracking-tight">
+                {examTitle || "New Assessment Draft"}
               </span>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Invigilator Entry PIN</label>
-                  <input
-                    type="text"
-                    value={examEntryPassword}
-                    onChange={(e) => setExamEntryPassword(e.target.value)}
-                    placeholder="e.g. password123"
-                    className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Admin Exit PIN</label>
-                  <input
-                    type="text"
-                    value={examAdminExitPassword}
-                    onChange={(e) => setExamAdminExitPassword(e.target.value)}
-                    placeholder="e.g. admin"
-                    className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
+              <span className="text-slate-300 font-bold">&gt;</span>
+              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
+                Question Composer
+              </span>
+              <span className="hidden md:inline text-xs text-slate-400 font-mono">
+                ({questions.length} Questions Defined)
+              </span>
             </div>
 
-            <button type="button" onClick={handleGenerateExam} className="mt-6 w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl mt-auto">
-              <ShieldCheck className="h-5 w-5 text-emerald-400" /> Finalize Exam Generation
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAddNewQuestionToPalette}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 px-3 py-1.5 transition-colors cursor-pointer"
+              >
+                Clear Form
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateExam}
+                className="bg-[#0f172a] hover:bg-[#1e293b] text-white text-xs font-extrabold px-5 py-2 rounded-full shadow-md transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Finalize & Publish Exam</span>
+              </button>
+            </div>
           </div>
 
-          {/* Question Composer & Active Pile */}
-          <div className="col-span-1 xl:col-span-2 flex flex-col gap-6 h-max">
-            {/* Dynamic Question Composer */}
-            <div className="glass p-6 rounded-3xl border border-white/60 flex flex-col gap-5 shadow-sm bg-gradient-to-br from-white/60 to-white/30">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/60 pb-4 gap-4">
-                <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">Question Composer</h3>
-                <div className="flex bg-slate-200/50 p-1.5 rounded-xl border border-slate-200 shadow-inner">
+          {/* Main 3-Column Layout */}
+          <div className="grid grid-cols-12 gap-5 items-start">
+            {/* ============================================================ */}
+            {/* LEFT COLUMN: Question Palette (Grid of Question Numbers)    */}
+            {/* ============================================================ */}
+            <div className="col-span-12 lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3.5 order-2 lg:order-1">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Question Palette
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAddNewQuestionToPalette}
+                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                >
+                  <PlusCircle className="w-3 h-3" /> Add
+                </button>
+              </div>
+
+              {/* 3-Column Question Numbers Grid */}
+              <div className="grid grid-cols-3 gap-2 max-h-[460px] overflow-y-auto pr-1">
+                {questions.map((q, idx) => {
+                  const isActive = editingQuestionIndex === idx;
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => handleSelectPaletteQuestion(idx)}
+                      className={`h-9 w-full rounded-lg border text-xs font-bold font-mono flex items-center justify-center transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-500 ring-offset-1 font-extrabold shadow-xs"
+                          : "bg-[#22c55e] text-white border-[#16a34a] hover:opacity-90"
+                      }`}
+                    >
+                      {(idx + 1).toString().padStart(2, "0")}
+                    </button>
+                  );
+                })}
+
+                {/* Add New Question Tile */}
+                <button
+                  type="button"
+                  onClick={handleAddNewQuestionToPalette}
+                  className={`h-9 w-full rounded-lg border-2 border-dashed flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
+                    editingQuestionIndex === null
+                      ? "border-indigo-500 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-400"
+                      : "border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600 bg-slate-50"
+                  }`}
+                  title="Add Question"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Legend & Stats */}
+              <div className="pt-3 border-t border-slate-100 flex flex-col gap-2 text-[11px] font-bold text-slate-600">
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded bg-[#22c55e]" /> Saved Questions
+                  </span>
+                  <span className="font-mono text-slate-800">{questions.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Total Marks:</span>
+                  <span className="font-mono text-indigo-600">
+                    {questions.reduce((acc, q) => acc + (q.points || 0), 0)} pts
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ============================================================ */}
+            {/* CENTER COLUMN: Question Composer Card (Matching Test Design) */}
+            {/* ============================================================ */}
+            <div className="col-span-12 lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-sm flex flex-col order-1 lg:order-2 min-h-[580px]">
+              {/* Question Header: Q: Number on left, Type tabs & Points on right */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-base sm:text-lg font-black text-slate-900 font-sans">
+                    Q: {editingQuestionIndex !== null ? editingQuestionIndex + 1 : questions.length + 1}
+                  </span>
+                  <div className="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-lg">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase">Marks:</span>
+                    <input
+                      type="number"
+                      value={draftQPoints}
+                      onChange={(e) => setDraftQPoints(Math.max(1, Number(e.target.value)))}
+                      className="w-12 text-center text-xs font-bold text-indigo-700 bg-white border border-slate-200 rounded px-1 py-0.5 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                   {(["mcq", "coding", "written"] as QuestionType[]).map((type) => (
                     <button
                       key={type}
                       type="button"
                       onClick={() => setDraftQType(type)}
-                      className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wide rounded-lg transition-all ${draftQType === type ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800 hover:bg-slate-300/50"}`}
+                      className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                        draftQType === type
+                          ? "bg-white text-indigo-600 shadow-xs border border-slate-200/60"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
                     >
-                      {type}
+                      {type === "mcq" ? "Multiple Choice" : type === "coding" ? "Coding Sandbox" : "Written"}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="md:col-span-3 flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Question Title</label>
-                  <input type="text" value={draftQTitle} onChange={(e) => setDraftQTitle(e.target.value)} placeholder="e.g., Explain the Big O complexity" className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all shadow-sm" />
+              {/* Question Title & Prompt Input Card */}
+              <div className="mt-5 p-5 bg-slate-50/70 rounded-2xl border border-slate-200/80 flex flex-col gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    Question Headline / Topic
+                  </label>
+                  <input
+                    type="text"
+                    value={draftQTitle}
+                    onChange={(e) => setDraftQTitle(e.target.value)}
+                    placeholder="e.g., Arrange the jumbled sequence / Invert Binary Tree"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
-                <div className="md:col-span-1 flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase"><Award className="inline h-3 w-3" /> Points</label>
-                  <input type="number" value={draftQPoints} onChange={(e) => setDraftQPoints(Number(e.target.value))} className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all shadow-sm text-center" />
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    Directives / Complete Question Text
+                  </label>
+                  <textarea
+                    value={draftQText}
+                    onChange={(e) => setDraftQText(e.target.value)}
+                    placeholder="Enter the complete question prompt, context, or paragraph instructions here..."
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-medium text-slate-700 h-24 resize-none focus:outline-none focus:border-indigo-500 leading-relaxed"
+                  />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Directives / Prompt</label>
-                <textarea value={draftQText} onChange={(e) => setDraftQText(e.target.value)} placeholder="Enter the main question body here..." className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium h-24 resize-none focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all shadow-sm" />
-              </div>
-
-              {/* Dynamic MCQ Options */}
+              {/* Type-Specific Composer Area */}
               {draftQType === "mcq" && (
-                <div className="flex flex-col gap-3 p-5 bg-white/80 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="mt-5 flex flex-col gap-3 flex-1">
                   <div className="flex items-center justify-between">
-                     <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-500"/> Multiple Choice Options</label>
-                     <button onClick={() => setMcqOptions([...mcqOptions, ""])} className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1 hover:text-indigo-800 transition-colors"><PlusCircle className="w-3 h-3"/> Add Option</button>
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Multiple Choice Options
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setMcqOptions([...mcqOptions, ""])}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> Add Option
+                    </button>
                   </div>
-                  <div className="flex flex-col gap-2 mt-2">
-                     {mcqOptions.map((opt, optIdx) => (
-                        <div key={optIdx} className={`flex items-center gap-3 p-2 rounded-xl border transition-all ${correctMcqIndex === optIdx ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-300' : 'border-slate-200 bg-white'}`}>
-                           <div onClick={() => setCorrectMcqIndex(optIdx)} className={`w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer shrink-0 ml-2 ${correctMcqIndex === optIdx ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-white'}`}>
-                              {correctMcqIndex === optIdx && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
-                           </div>
-                           <input
-                              type="text"
-                              placeholder={`Option ${optIdx + 1}`}
-                              value={opt}
-                              onChange={(e) => {
-                                 const n = [...mcqOptions];
-                                 n[optIdx] = e.target.value;
-                                 setMcqOptions(n);
+
+                  <div className="flex flex-col gap-2.5">
+                    {mcqOptions.map((opt, optIdx) => {
+                      const letter = String.fromCharCode(97 + optIdx); // a, b, c, d
+                      const isCorrect = correctMcqIndex === optIdx;
+                      return (
+                        <div
+                          key={optIdx}
+                          className={`w-full p-3.5 rounded-xl border-2 transition-all flex items-center gap-3 ${
+                            isCorrect
+                              ? "bg-slate-100/90 border-[#1e293b] text-slate-900 shadow-xs"
+                              : "bg-white border-slate-200 text-slate-700"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setCorrectMcqIndex(optIdx)}
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center font-bold text-xs shrink-0 cursor-pointer ${
+                              isCorrect
+                                ? "bg-[#0f172a] border-[#0f172a] text-white"
+                                : "border-slate-300 text-slate-500 hover:border-slate-400"
+                            }`}
+                            title="Click to mark as correct answer"
+                          >
+                            {letter}
+                          </button>
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={(e) => {
+                              const n = [...mcqOptions];
+                              n[optIdx] = e.target.value;
+                              setMcqOptions(n);
+                            }}
+                            placeholder={`Enter Option ${letter.toUpperCase()} text...`}
+                            className="flex-1 bg-transparent border-none text-xs font-medium text-slate-800 focus:outline-none"
+                          />
+                          {isCorrect && (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0">
+                              Correct Key
+                            </span>
+                          )}
+                          {mcqOptions.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const n = mcqOptions.filter((_, i) => i !== optIdx);
+                                setMcqOptions(n);
+                                if (correctMcqIndex === optIdx) setCorrectMcqIndex(0);
+                                else if (correctMcqIndex > optIdx) setCorrectMcqIndex(correctMcqIndex - 1);
                               }}
-                              className="flex-1 bg-transparent border-none text-sm font-medium focus:outline-none px-2"
-                           />
-                           {mcqOptions.length > 2 && (
-                              <button onClick={() => {
-                                 const n = mcqOptions.filter((_, i) => i !== optIdx);
-                                 setMcqOptions(n);
-                                 if(correctMcqIndex === optIdx) setCorrectMcqIndex(0);
-                                 else if (correctMcqIndex > optIdx) setCorrectMcqIndex(correctMcqIndex - 1);
-                              }} className="p-2 text-rose-400 hover:text-rose-600 transition-colors">
-                                 <Trash2 className="w-4 h-4" />
-                              </button>
-                           )}
+                              className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
-                     ))}
+                      );
+                    })}
                   </div>
-                  <p className="text-[10px] font-bold text-slate-400 mt-2">Select the radio button next to the correct answer.</p>
+                  <p className="text-[11px] text-slate-400 font-medium mt-1">
+                    💡 Click on a letter circle (a, b, c, d) to designate it as the official answer key.
+                  </p>
                 </div>
               )}
 
-              {/* Dynamic Coding Test Cases & Real-Time Compiler */}
               {draftQType === "coding" && (
-                <div className="flex flex-col gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-md text-slate-300">
+                <div className="mt-5 flex flex-col gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 text-slate-200">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-2">
                       <Code className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-bold text-slate-200">Coding Question Workbench & Backend Compiler</span>
+                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        Real-Time Compiler & Sandbox Test Cases
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-slate-400 font-bold uppercase">Language:</span>
@@ -733,7 +836,7 @@ export default function TeacherDesk({
                         value={codeBoilerplate}
                         onChange={(e) => setCodeBoilerplate(e.target.value)}
                         placeholder={`function solution(args) {\n  // Write your code here\n  return args;\n}`}
-                        className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono h-36 resize-none focus:outline-none focus:border-indigo-500 text-emerald-400"
+                        className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono h-32 resize-none focus:outline-none focus:border-indigo-500 text-emerald-400"
                       />
                     </div>
 
@@ -742,61 +845,48 @@ export default function TeacherDesk({
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                           Teacher Reference Solution (Optional to Test)
                         </label>
-                        <span className="text-[9px] text-slate-500">Leave blank to test boilerplate</span>
+                        <span className="text-[9px] text-slate-500">To validate test cases</span>
                       </div>
                       <textarea
                         value={solutionCodeToTest}
                         onChange={(e) => setSolutionCodeToTest(e.target.value)}
-                        placeholder={`// Enter reference solution to verify test cases\nfunction solution(args) {\n  return args;\n}`}
-                        className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono h-36 resize-none focus:outline-none focus:border-indigo-500 text-cyan-400"
+                        placeholder={`// Reference code to test test cases\nfunction solution(args) {\n  return args;\n}`}
+                        className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono h-32 resize-none focus:outline-none focus:border-indigo-500 text-cyan-400"
                       />
                     </div>
                   </div>
 
-                  {/* Test Cases Definition & Management */}
+                  {/* Test Cases List */}
                   <div className="flex items-center justify-between border-t border-slate-800 pt-3">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-bold text-slate-300 uppercase">Test Cases Specification</label>
-                      <span className="text-[10px] text-slate-400">({testCases.length} Defined)</span>
-                    </div>
+                    <span className="text-xs font-bold text-slate-300 uppercase">
+                      Test Cases Specification ({testCases.length})
+                    </span>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={runCompilerValidation}
                         disabled={isCompiling}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3.5 rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
                       >
                         <Play className="w-3.5 h-3.5 fill-current" />
-                        {isCompiling ? "Compiling on Server..." : "Run & Validate Test Cases"}
+                        {isCompiling ? "Compiling..." : "Run Test Cases"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setTestCases([...testCases, { input: "", expectedOutput: "", isHidden: false }])}
-                        className="text-xs font-bold uppercase tracking-wider text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors px-2"
+                        className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
                       >
-                        <PlusCircle className="w-3.5 h-3.5" /> Add Test Case
+                        <PlusCircle className="w-3.5 h-3.5" /> Add Case
                       </button>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col gap-2">
                     {testCases.map((tc, idx) => {
                       const res = compileResults.find((r) => r.index === idx);
                       return (
-                        <div
-                          key={idx}
-                          className={`grid grid-cols-12 gap-3 items-center p-3 rounded-xl border transition-all ${
-                            res
-                              ? res.passed
-                                ? "bg-emerald-950/40 border-emerald-800"
-                                : "bg-rose-950/40 border-rose-800"
-                              : "bg-slate-800 border-slate-700"
-                          }`}
-                        >
-                          <div className="col-span-4 flex flex-col gap-1">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                              Input Arguments
-                            </label>
+                        <div key={idx} className="grid grid-cols-12 gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs items-center">
+                          <div className="col-span-4">
                             <input
                               type="text"
                               value={tc.input}
@@ -805,15 +895,11 @@ export default function TeacherDesk({
                                 n[idx].input = e.target.value;
                                 setTestCases(n);
                               }}
-                              placeholder='e.g. [2, 7, 11, 15], 9'
-                              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none"
+                              placeholder="Input: e.g. [2, 7, 11, 15]"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-200"
                             />
                           </div>
-
-                          <div className="col-span-4 flex flex-col gap-1">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                              Expected Output
-                            </label>
+                          <div className="col-span-4">
                             <input
                               type="text"
                               value={tc.expectedOutput}
@@ -822,24 +908,19 @@ export default function TeacherDesk({
                                 n[idx].expectedOutput = e.target.value;
                                 setTestCases(n);
                               }}
-                              placeholder='e.g. [0, 1]'
-                              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-mono text-emerald-400 focus:border-indigo-500 focus:outline-none"
+                              placeholder="Expected: e.g. [0, 1]"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-emerald-400"
                             />
                           </div>
-
-                          <div className="col-span-3 flex items-center gap-2 pt-3">
+                          <div className="col-span-3">
                             {res ? (
-                              <span
-                                className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md border flex items-center gap-1 ${
-                                  res.passed
-                                    ? "bg-emerald-900/60 text-emerald-300 border-emerald-700"
-                                    : "bg-rose-900/60 text-rose-300 border-rose-700"
-                                }`}
-                              >
-                                {res.passed ? "✔ PASSED" : "✖ FAILED"} ({res.timeMs}ms)
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                res.passed ? "bg-emerald-900/60 text-emerald-300" : "bg-rose-900/60 text-rose-300"
+                              }`}>
+                                {res.passed ? "✔ PASS" : "✖ FAIL"} ({res.timeMs}ms)
                               </span>
                             ) : (
-                              <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                              <label className="text-[10px] text-slate-400 flex items-center gap-1">
                                 <input
                                   type="checkbox"
                                   checked={tc.isHidden || false}
@@ -848,94 +929,222 @@ export default function TeacherDesk({
                                     n[idx].isHidden = e.target.checked;
                                     setTestCases(n);
                                   }}
-                                  className="rounded text-indigo-500"
                                 />
-                                Hidden Case
+                                Hidden
                               </label>
                             )}
                           </div>
-
-                          <div className="col-span-1 flex items-center justify-end pt-3">
-                            <button
-                              type="button"
-                              onClick={() => setTestCases(testCases.filter((_, i) => i !== idx))}
-                              className="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg hover:bg-rose-500/20 hover:text-rose-300 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          <div className="col-span-1 text-right">
+                            {testCases.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setTestCases(testCases.filter((_, i) => i !== idx))}
+                                className="text-slate-500 hover:text-rose-400 p-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Live Backend Compiler Console Output */}
                   {compilerOutputLogs && (
-                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1 flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold border-b border-slate-900 pb-1">
-                        <span className="flex items-center gap-1.5 text-slate-300">
-                          <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Backend Compiler Sandbox Logs
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setCompilerOutputLogs("")}
-                          className="text-slate-500 hover:text-slate-300 transition-colors"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <pre className="text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
-                        {compilerOutputLogs}
-                      </pre>
-                    </div>
+                    <pre className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-[10px] font-mono text-slate-300 max-h-24 overflow-y-auto">
+                      {compilerOutputLogs}
+                    </pre>
                   )}
                 </div>
               )}
 
-              <button onClick={handleAddQuestion} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition-colors self-end shadow-md flex items-center gap-2">
-                 <Plus className="w-5 h-5"/> Add to Exam Draft
-              </button>
+              {/* Bottom Action Bar */}
+              <div className="flex items-center justify-between mt-8 pt-4 border-t border-slate-200">
+                {editingQuestionIndex !== null ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteQuestion(editingQuestionIndex)}
+                    className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete Question
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAddNewQuestionToPalette}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                  >
+                    Clear Form
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSaveAndNextQuestion}
+                  className="px-6 py-2.5 bg-[#0f172a] hover:bg-[#1e293b] text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
+                >
+                  <span>Save and Next Question</span>
+                  <span>→</span>
+                </button>
+              </div>
             </div>
 
-            {/* Active Questions Pile */}
-            <div className="glass p-6 rounded-3xl border border-white/60 flex flex-col gap-4 shadow-sm">
-              <h3 className="font-bold text-slate-800 text-sm border-b border-slate-200/60 pb-3 flex items-center justify-between">
-                 Active Question Pile
-                 <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{questions.length} Questions</span>
-              </h3>
-              
-              {questions.length === 0 ? (
-                 <div className="bg-white/50 border border-dashed border-slate-300 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3">
-                    <div className="p-4 bg-slate-100 rounded-full text-slate-400">
-                       <FileText className="w-8 h-8" />
-                    </div>
-                    <div>
-                       <p className="text-sm font-bold text-slate-600">Draft is empty</p>
-                       <p className="text-xs text-slate-400 mt-1">Add questions from the composer above to build your exam.</p>
-                    </div>
-                 </div>
-              ) : (
-                 <div className="flex flex-col gap-3">
-                   {questions.map((q, i) => (
-                     <div key={q.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between gap-4 sm:items-center hover:border-indigo-200 transition-colors group">
-                       <div className="flex gap-4 items-center">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center text-sm">{i+1}</div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-sm font-bold text-slate-800">{q.title}</span>
-                            <div className="flex gap-2 items-center mt-1">
-                               <span className="text-[9px] font-bold uppercase tracking-wide bg-indigo-50 border border-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">{q.type}</span>
-                               <span className="text-[10px] font-bold text-slate-500">{q.points} Points</span>
-                               {q.type === 'coding' && <span className="text-[10px] font-bold text-slate-500">• {q.testCases?.length || 0} Test Cases</span>}
-                            </div>
-                          </div>
-                       </div>
-                       <button onClick={() => setQuestions(questions.filter(x => x.id !== q.id))} className="text-xs text-rose-500 font-bold bg-rose-50 px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all flex items-center gap-2 self-start sm:self-auto hover:bg-rose-100">
-                          <Trash2 className="w-4 h-4"/> Remove
-                       </button>
-                     </div>
-                   ))}
-                 </div>
-              )}
+            {/* ============================================================ */}
+            {/* RIGHT COLUMN: Duration Timer, Security & Exam Overview      */}
+            {/* ============================================================ */}
+            <div className="col-span-12 lg:col-span-3 flex flex-col gap-4 order-3">
+              {/* Digital Duration Configurator */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm text-center">
+                <div className="flex items-center justify-center gap-2 font-mono text-2xl font-black text-slate-800">
+                  <input
+                    type="number"
+                    min="0"
+                    max="12"
+                    value={Math.floor(examDuration / 60)}
+                    onChange={(e) => {
+                      const hrs = Math.max(0, Number(e.target.value));
+                      const mins = examDuration % 60;
+                      setExamDuration(hrs * 60 + mins);
+                    }}
+                    className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 text-2xl font-black focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-slate-300">:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={examDuration % 60}
+                    onChange={(e) => {
+                      const mins = Math.max(0, Math.min(59, Number(e.target.value)));
+                      const hrs = Math.floor(examDuration / 60);
+                      setExamDuration(hrs * 60 + mins);
+                    }}
+                    className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 text-2xl font-black focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-slate-300">:</span>
+                  <span className="w-14 text-slate-400 py-1 text-2xl font-black">00</span>
+                </div>
+                <div className="flex justify-between px-3 mt-1.5 text-[11px] font-bold text-slate-400">
+                  <span className="w-14 text-center">Hrs</span>
+                  <span className="w-14 text-center">Min</span>
+                  <span className="w-14 text-center">Sec</span>
+                </div>
+              </div>
+
+              {/* Security PINs and Camera Proctoring Settings */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-indigo-500" /> Exam Security PINs
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Invigilator Entry PIN</label>
+                    <input
+                      type="text"
+                      value={examEntryPassword}
+                      onChange={(e) => setExamEntryPassword(e.target.value)}
+                      placeholder="e.g. password123"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Admin Exit PIN</label>
+                    <input
+                      type="text"
+                      value={examAdminExitPassword}
+                      onChange={(e) => setExamAdminExitPassword(e.target.value)}
+                      placeholder="e.g. admin"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-bold text-slate-600">AI Video Proctoring</span>
+                    <input
+                      type="checkbox"
+                      checked={examRequireCamera}
+                      onChange={(e) => setExamRequireCamera(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-bold text-slate-600">Strict App Lockdown</span>
+                    <input
+                      type="checkbox"
+                      checked={examLockdownBrowsing}
+                      onChange={(e) => setExamLockdownBrowsing(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Overview Breakdown Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 mb-3">
+                  Overview
+                </h4>
+                <div className="space-y-3 text-xs font-semibold text-slate-600">
+                  <div className="flex justify-between items-center">
+                    <span>Total Questions</span>
+                    <span className="font-bold text-slate-800">{questions.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Total Marks</span>
+                    <span className="font-bold text-slate-800">
+                      {questions.reduce((acc, q) => acc + (q.points || 0), 0)} pts
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>MCQ Questions</span>
+                    <span className="font-bold text-emerald-600">
+                      {questions.filter((q) => q.type === "mcq").length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Coding Sandbox</span>
+                    <span className="font-bold text-indigo-600">
+                      {questions.filter((q) => q.type === "coding").length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Pass Threshold</span>
+                    <span className="font-bold text-slate-800">{examIntegrityThreshold}%</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Target Departments</label>
+                    <MultiSelect
+                      options={[
+                        { id: "Computer Science", label: "Computer Science" },
+                        { id: "Mathematics", label: "Mathematics" },
+                        { id: "Physics", label: "Physics" },
+                      ]}
+                      selected={getDepts("draft")}
+                      onChange={(val) => setWidgetDepts("draft", val)}
+                      placeholder="Select Departments"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Target Years</label>
+                    <MultiSelect
+                      options={[
+                        { id: "First Year", label: "First Year" },
+                        { id: "Second Year", label: "Second Year" },
+                        { id: "Third Year", label: "Third Year" },
+                        { id: "Fourth Year", label: "Fourth Year" },
+                      ]}
+                      selected={getYears("draft")}
+                      onChange={(val) => setWidgetYears("draft", val)}
+                      placeholder="Select Years"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
